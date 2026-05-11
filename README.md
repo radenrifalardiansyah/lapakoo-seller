@@ -1,2 +1,11 @@
-# eleven-seller
-Seller Panel
+
+  # Seller Management Dashboard
+
+  This is a code bundle for Seller Management Dashboard. The original project is available at https://www.figma.com/design/qWYceGw3TOQSR4xYZdMfJZ/Seller-Management-Dashboard.
+
+  ## Running the code
+
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
+  
