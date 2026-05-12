@@ -72,13 +72,13 @@ const MOCK_TENANTS: Record<string, Tenant> = {
     package: PACKAGES.business,
     status: 'active',
   },
-  // Default dev tenant — dipakai saat akses dari localhost tanpa subdomain
-  __dev__: {
+  // Default fallback — dipakai saat akses langsung (localhost, Vercel root, dll.)
+  __default__: {
     id: '0',
-    subdomain: '__dev__',
-    storeName: 'Dev Seller Panel',
-    ownerName: 'Developer',
-    email: 'dev@localhost',
+    subdomain: '__default__',
+    storeName: 'Eleven Seller',
+    ownerName: 'Admin',
+    email: 'admin@eleven-seller.vercel.app',
     primaryColor: '#6366f1',
     package: PACKAGES.business,
     status: 'active',
@@ -86,6 +86,11 @@ const MOCK_TENANTS: Record<string, Tenant> = {
 };
 
 // ─── Subdomain extractor ──────────────────────────────────────────────────────
+
+// Platform hosting dengan 2-level suffix (project.platform.tld).
+// Pada domain ini, "project" adalah nama project, bukan subdomain tenant.
+// Subdomain tenant baru ada jika ada 4+ part: tenant.project.platform.tld
+const TWO_LEVEL_SUFFIXES = ['vercel.app', 'netlify.app', 'pages.dev', 'web.app'];
 
 function getSubdomain(): string | null {
   const host = window.location.hostname.split(':')[0]; // strip port
@@ -99,11 +104,28 @@ function getSubdomain(): string | null {
   // IP address — no subdomain
   if (/^\d+$/.test(parts[parts.length - 1])) return null;
 
+  // Platform dengan 2-level suffix (vercel.app, netlify.app, dll.)
+  // eleven-seller.vercel.app (3 parts) → null (ini project root, bukan tenant)
+  // demo.eleven-seller.vercel.app (4 parts) → "demo" (ini subdomain tenant)
+  const twoLevelSuffix = TWO_LEVEL_SUFFIXES.find(s => host.endsWith('.' + s) || host === s);
+  if (twoLevelSuffix) {
+    const suffixParts = twoLevelSuffix.split('.').length; // 2
+    return parts.length > suffixParts + 1 ? parts[0] : null;
+  }
+
   // domain.tld (no subdomain)
   if (parts.length <= 2) return null;
 
   // subdomain.domain.tld
   return parts[0];
+}
+
+// Prioritas tenant: ?tenant=xxx query param (untuk demo/preview)
+function getTenantKey(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const qTenant = params.get('tenant');
+  if (qTenant) return qTenant;
+  return getSubdomain();
 }
 
 // ─── Simulated API fetch ──────────────────────────────────────────────────────
@@ -112,7 +134,7 @@ async function fetchTenantBySubdomain(subdomain: string | null): Promise<Tenant>
   // Simulasi network delay
   await new Promise(r => setTimeout(r, 400));
 
-  if (!subdomain) return MOCK_TENANTS.__dev__;
+  if (!subdomain) return MOCK_TENANTS.__default__;
 
   const tenant = MOCK_TENANTS[subdomain];
   if (!tenant) throw new Error(`Toko dengan subdomain "${subdomain}" tidak ditemukan.`);
@@ -136,7 +158,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const subdomain = getSubdomain();
+    const subdomain = getTenantKey();
     fetchTenantBySubdomain(subdomain)
       .then(data => setTenant(data))
       .catch(err => setError(err.message))
