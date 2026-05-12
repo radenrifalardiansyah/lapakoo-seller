@@ -7,34 +7,37 @@ const PACKAGES: Record<string, Package> = {
   starter: {
     id: 'starter',
     name: 'Starter',
-    features: ['dashboard', 'products', 'orders', 'notifications', 'settings', 'help'],
+    features: ['dashboard', 'products', 'warehouse', 'orders', 'notifications', 'settings', 'help'],
     maxProducts: 50,
     maxOrders: 100,
     maxUsers: 1,
+    maxWarehouses: 1,
   },
   pro: {
     id: 'pro',
     name: 'Pro',
     features: [
-      'dashboard', 'products', 'orders', 'analytics',
+      'dashboard', 'products', 'warehouse', 'orders', 'analytics',
       'customers', 'marketing', 'payments',
       'notifications', 'settings', 'help', 'team',
     ],
     maxProducts: 500,
     maxOrders: -1,
     maxUsers: 5,
+    maxWarehouses: 5,
   },
   business: {
     id: 'business',
     name: 'Business',
     features: [
-      'dashboard', 'products', 'orders', 'analytics',
+      'dashboard', 'products', 'warehouse', 'orders', 'analytics',
       'customers', 'resellers', 'marketing', 'payments',
       'notifications', 'settings', 'help', 'team',
     ],
     maxProducts: -1,
     maxOrders: -1,
     maxUsers: -1,
+    maxWarehouses: -1,
   },
 };
 

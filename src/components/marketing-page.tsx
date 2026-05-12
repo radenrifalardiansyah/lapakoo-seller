@@ -25,7 +25,7 @@ import {
   Package, Power, RefreshCw, ChevronDown, ChevronUp,
   Calendar, Ban,
 } from 'lucide-react'
-import { initialProducts } from './product-management'
+import { useInventory } from '../contexts/InventoryContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -411,6 +411,7 @@ function FlashSaleFormDialog({
   onClose: () => void
   onSave: (data: FSForm) => void
 }) {
+  const { products, statusOf } = useInventory()
   const [form, setForm] = useState<FSForm>(initial)
   const [addProductId, setAddProductId] = useState<string>('')
   const [addSalePrice, setAddSalePrice] = useState('')
@@ -422,13 +423,13 @@ function FlashSaleFormDialog({
     else onClose()
   }
 
-  const availableProducts = initialProducts.filter(
-    p => p.status === 'active' && !form.items.some(it => it.productId === p.id)
+  const availableProducts = products.filter(
+    p => statusOf(p.id) === 'active' && !form.items.some(it => it.productId === p.id)
   )
 
   const handleAddItem = () => {
     setAddError('')
-    const prod = initialProducts.find(p => p.id === Number(addProductId))
+    const prod = products.find(p => p.id === Number(addProductId))
     if (!prod) { setAddError('Pilih produk terlebih dahulu'); return }
     const sp = Number(addSalePrice)
     if (!sp || sp <= 0) { setAddError('Harga flash sale harus lebih dari 0'); return }
@@ -556,7 +557,7 @@ function FlashSaleFormDialog({
               )}
               {addProductId && addSalePrice && Number(addSalePrice) > 0 && (
                 (() => {
-                  const prod = initialProducts.find(p => p.id === Number(addProductId))
+                  const prod = products.find(p => p.id === Number(addProductId))
                   if (!prod || Number(addSalePrice) >= prod.price) return null
                   return (
                     <p className="text-xs text-green-600">

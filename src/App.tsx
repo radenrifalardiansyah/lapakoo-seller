@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { TenantProvider, useTenant } from "./contexts/TenantContext";
+import { InventoryProvider, useInventory } from "./contexts/InventoryContext";
 import { SellerSidebar } from "./components/seller-sidebar";
 import { DashboardOverview } from "./components/dashboard-overview";
-import { ProductManagement, initialProducts } from "./components/product-management";
+import { ProductManagement } from "./components/product-management";
+import { WarehouseManagement } from "./components/warehouse-management";
 import { OrderManagement, initialOrders } from "./components/order-management";
 import { AnalyticsDashboard } from "./components/analytics-dashboard";
 import { CustomersPage } from "./components/customers-page";
@@ -95,10 +97,17 @@ function TenantErrorScreen({ message }: { message: string }) {
 
 function AppInner() {
   const { tenant, loading, error, hasFeature } = useTenant();
+  const { products, totalStockOf } = useInventory();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [productAction, setProductAction] = useState<'add' | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  const goToAddProduct = () => {
+    setActiveTab("products");
+    setProductAction("add");
+  };
 
   if (loading) return <TenantLoadingScreen />;
   if (error)   return <TenantErrorScreen message={error} />;
@@ -140,8 +149,9 @@ function AppInner() {
       );
     }
     switch (activeTab) {
-      case "dashboard":     return <DashboardOverview />;
-      case "products":      return <ProductManagement />;
+      case "dashboard":     return <DashboardOverview onAddProduct={goToAddProduct} />;
+      case "products":      return <ProductManagement initialAction={productAction} onActionConsumed={() => setProductAction(null)} />;
+      case "warehouse":     return <WarehouseManagement />;
       case "orders":        return <OrderManagement />;
       case "analytics":     return <AnalyticsDashboard />;
       case "customers":     return <CustomersPage />;
@@ -156,7 +166,7 @@ function AppInner() {
     }
   };
 
-  const productBadge   = initialProducts.filter(p => p.stock <= 5).length;
+  const productBadge   = products.filter(p => totalStockOf(p.id) <= 5).length;
   const orderBadge     = initialOrders.filter(o => o.status === 'pending').length;
   const resellerBadge  = initialResellers.filter(r => r.status === 'pending').length;
   const marketingBadge = initialVouchers.filter(v => {
@@ -188,21 +198,16 @@ function AppInner() {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-2.5">
+            <div className="md:hidden flex items-center gap-2.5 min-w-0">
               <div
-                className="hidden md:flex w-8 h-8 rounded-xl items-center justify-center shrink-0 text-white"
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white"
                 style={{ backgroundColor: primaryColor }}
               >
                 <Store className="w-4 h-4" />
               </div>
-              <div>
-                <h2 className="text-sm font-bold text-gray-900 leading-tight">
-                  {tenant?.storeName ?? 'Seller Management'}
-                </h2>
-                <p className="text-[11px] font-medium leading-tight hidden md:block" style={{ color: primaryColor }}>
-                  Paket {tenant?.package.name}
-                </p>
-              </div>
+              <h2 className="text-sm font-bold text-gray-900 leading-tight truncate">
+                {tenant?.storeName ?? 'Seller Management'}
+              </h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -240,7 +245,9 @@ function AppInner() {
 export default function App() {
   return (
     <TenantProvider>
-      <AppInner />
+      <InventoryProvider>
+        <AppInner />
+      </InventoryProvider>
     </TenantProvider>
   );
 }

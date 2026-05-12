@@ -1,6 +1,7 @@
 export type FeatureKey =
   | 'dashboard'
   | 'products'
+  | 'warehouse'
   | 'orders'
   | 'analytics'
   | 'customers'
@@ -17,8 +18,9 @@ export interface Package {
   name: string;
   features: FeatureKey[];
   maxProducts: number;
-  maxOrders: number; // -1 = unlimited
-  maxUsers: number;  // -1 = unlimited
+  maxOrders: number;     // -1 = unlimited
+  maxUsers: number;      // -1 = unlimited
+  maxWarehouses: number; // -1 = unlimited
 }
 
 export interface Tenant {

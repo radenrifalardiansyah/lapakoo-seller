@@ -27,85 +27,11 @@ import { Separator } from "./ui/separator"
 import {
   Plus, Search, Edit, Trash2, Eye, Package, AlertTriangle,
   FileSpreadsheet, X, Check, Camera, Upload, Tags, FolderOpen,
-  ChevronDown
+  Warehouse,
 } from 'lucide-react'
 import { ImageWithFallback } from './figma/ImageWithFallback'
-
-interface Product {
-  id: number
-  name: string
-  category: string
-  price: number
-  stock: number
-  status: string
-  image: string
-  sku: string
-  weight?: number
-  description?: string
-}
-
-export const initialProducts: Product[] = [
-  {
-    id: 1,
-    name: 'iPhone 14 Pro Max',
-    category: 'Electronics',
-    price: 15999000,
-    stock: 25,
-    status: 'active',
-    image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=200&h=200&fit=crop',
-    sku: 'IPH14PM-256-SG',
-    weight: 240,
-    description: 'Smartphone flagship Apple dengan chip A16 Bionic, kamera 48MP, layar Super Retina XDR 6.7 inci.',
-  },
-  {
-    id: 2,
-    name: 'Samsung Galaxy S23 Ultra',
-    category: 'Electronics',
-    price: 18999000,
-    stock: 15,
-    status: 'active',
-    image: 'https://images.unsplash.com/photo-1610792516307-ea5aabac2b31?w=200&h=200&fit=crop',
-    sku: 'SGS23U-512-BK',
-    weight: 234,
-    description: 'Flagship Samsung dengan S Pen terintegrasi, kamera 200MP, dan baterai 5000mAh.',
-  },
-  {
-    id: 3,
-    name: 'MacBook Air M2',
-    category: 'Electronics',
-    price: 18999000,
-    stock: 8,
-    status: 'active',
-    image: 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=200&h=200&fit=crop',
-    sku: 'MBA-M2-256-SG',
-    weight: 1240,
-    description: 'Laptop tipis Apple dengan chip M2, layar Liquid Retina 13.6 inci, dan ketahanan baterai hingga 18 jam.',
-  },
-  {
-    id: 4,
-    name: 'Nike Air Jordan 1',
-    category: 'Fashion',
-    price: 2499000,
-    stock: 3,
-    status: 'low_stock',
-    image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=200&h=200&fit=crop',
-    sku: 'NAJ1-42-RED',
-    weight: 500,
-    description: 'Sepatu basket ikonik Nike dengan desain retro klasik.',
-  },
-  {
-    id: 5,
-    name: 'Adidas Ultraboost 22',
-    category: 'Fashion',
-    price: 2899000,
-    stock: 0,
-    status: 'out_of_stock',
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-    sku: 'AUB22-43-WHT',
-    weight: 350,
-    description: 'Sepatu lari premium dengan teknologi Boost untuk kenyamanan maksimal.',
-  },
-]
+import { useInventory } from '../contexts/InventoryContext'
+import type { Product } from '../types/inventory'
 
 const DEFAULT_CATEGORIES = ['Electronics', 'Fashion', 'Home & Garden', 'Sports', 'Books', 'Other']
 
@@ -113,8 +39,6 @@ const emptyForm: Omit<Product, 'id'> = {
   name: '',
   category: '',
   price: 0,
-  stock: 0,
-  status: 'active',
   image: '',
   sku: '',
   weight: 0,
@@ -127,12 +51,6 @@ function formatPrice(price: number) {
     currency: 'IDR',
     minimumFractionDigits: 0,
   }).format(price)
-}
-
-function deriveStatus(stock: number): string {
-  if (stock === 0) return 'out_of_stock'
-  if (stock <= 5) return 'low_stock'
-  return 'active'
 }
 
 function StatusBadge({ stock }: { stock: number }) {
@@ -317,7 +235,7 @@ interface ImportRow {
   'SKU': string
   'Kategori': string
   'Harga (Rp)': number | string
-  'Stok': number | string
+  'Stok Awal': number | string
   'Berat (gram)': number | string
   'Deskripsi': string
   [key: string]: unknown
@@ -333,11 +251,13 @@ function ImportDialog({
   onClose,
   onImport,
   categories,
+  primaryWarehouseName,
 }: {
   open: boolean
   onClose: () => void
-  onImport: (products: Omit<Product, 'id'>[]) => void
+  onImport: (products: Array<{ data: Omit<Product, 'id'>; initialStock: number }>) => void
   categories: string[]
+  primaryWarehouseName: string
 }) {
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<ImportRow[]>([])
@@ -401,7 +321,7 @@ function ImportDialog({
         'SKU': 'SKU-001',
         'Kategori': categories[0] || 'Electronics',
         'Harga (Rp)': 150000,
-        'Stok': 20,
+        'Stok Awal': 20,
         'Berat (gram)': 300,
         'Deskripsi': 'Deskripsi produk contoh',
       },
@@ -410,13 +330,13 @@ function ImportDialog({
         'SKU': 'SKU-002',
         'Kategori': categories[1] || 'Fashion',
         'Harga (Rp)': 250000,
-        'Stok': 5,
+        'Stok Awal': 5,
         'Berat (gram)': 500,
         'Deskripsi': 'Deskripsi produk kedua',
       },
     ]
     const ws = XLSX.utils.json_to_sheet(template)
-    ws['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 35 }]
+    ws['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 35 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Template Produk')
     XLSX.writeFile(wb, 'template-import-produk.xlsx')
@@ -429,15 +349,16 @@ function ImportDialog({
     const valid = rows
       .filter((_, i) => !errorRowNumbers.has(i + 2))
       .map(row => ({
-        name: String(row['Nama Produk']).trim(),
-        sku: String(row['SKU']).trim(),
-        category: String(row['Kategori']).trim(),
-        price: Number(row['Harga (Rp)']) || 0,
-        stock: Number(row['Stok']) || 0,
-        weight: Number(row['Berat (gram)']) || 0,
-        description: String(row['Deskripsi'] || ''),
-        image: '',
-        status: deriveStatus(Number(row['Stok']) || 0),
+        data: {
+          name: String(row['Nama Produk']).trim(),
+          sku: String(row['SKU']).trim(),
+          category: String(row['Kategori']).trim(),
+          price: Number(row['Harga (Rp)']) || 0,
+          weight: Number(row['Berat (gram)']) || 0,
+          description: String(row['Deskripsi'] || ''),
+          image: '',
+        },
+        initialStock: Number(row['Stok Awal']) || 0,
       }))
     onImport(valid)
     reset()
@@ -458,7 +379,9 @@ function ImportDialog({
           <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div>
               <p className="text-sm font-medium text-blue-800">Download template terlebih dahulu</p>
-              <p className="text-xs text-blue-600 mt-0.5">Gunakan format kolom yang benar agar import berhasil</p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Stok awal akan dimasukkan ke gudang utama ({primaryWarehouseName}).
+              </p>
             </div>
             <Button size="sm" variant="outline" onClick={handleDownloadTemplate} className="border-blue-300 text-blue-700 hover:bg-blue-50 shrink-0">
               <FileSpreadsheet className="w-4 h-4 mr-1.5" />
@@ -473,7 +396,7 @@ function ImportDialog({
               { col: 'SKU', req: true },
               { col: 'Kategori', req: true },
               { col: 'Harga (Rp)', req: true },
-              { col: 'Stok', req: false },
+              { col: 'Stok Awal', req: false },
               { col: 'Berat (gram)', req: false },
               { col: 'Deskripsi', req: false },
             ].map(item => (
@@ -564,7 +487,7 @@ function ImportDialog({
                       <TableHead className="text-xs">SKU</TableHead>
                       <TableHead className="text-xs">Kategori</TableHead>
                       <TableHead className="text-xs text-right">Harga</TableHead>
-                      <TableHead className="text-xs text-right">Stok</TableHead>
+                      <TableHead className="text-xs text-right">Stok Awal</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -582,7 +505,7 @@ function ImportDialog({
                           <TableCell className="text-xs text-right">
                             {Number(row['Harga (Rp)'] || 0).toLocaleString('id-ID')}
                           </TableCell>
-                          <TableCell className="text-xs text-right">{String(row['Stok'] || '0')}</TableCell>
+                          <TableCell className="text-xs text-right">{String(row['Stok Awal'] || '0')}</TableCell>
                         </TableRow>
                       )
                     })}
@@ -635,7 +558,10 @@ function ViewProductDialog({
   open: boolean
   onClose: () => void
 }) {
+  const { warehouses, distributionOf, totalStockOf } = useInventory()
   if (!product) return null
+  const total = totalStockOf(product.id)
+  const dist = distributionOf(product.id)
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -652,7 +578,7 @@ function ViewProductDialog({
             <div className="flex-1 space-y-1">
               <p className="font-semibold text-lg leading-tight">{product.name}</p>
               <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-              <StatusBadge stock={product.stock} />
+              <StatusBadge stock={total} />
             </div>
           </div>
           <Separator />
@@ -666,9 +592,9 @@ function ViewProductDialog({
               <p className="font-medium">{formatPrice(product.price)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Stok</p>
-              <p className={`font-medium ${product.stock === 0 ? 'text-red-600' : product.stock <= 5 ? 'text-orange-600' : ''}`}>
-                {product.stock} unit
+              <p className="text-muted-foreground">Total Stok</p>
+              <p className={`font-medium ${total === 0 ? 'text-red-600' : total <= 5 ? 'text-orange-600' : ''}`}>
+                {total} unit
               </p>
             </div>
             <div>
@@ -676,6 +602,32 @@ function ViewProductDialog({
               <p className="font-medium">{product.weight ?? '-'} gram</p>
             </div>
           </div>
+
+          <Separator />
+          <div className="text-sm">
+            <p className="text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Warehouse className="w-3.5 h-3.5" />
+              Distribusi Stok per Gudang
+            </p>
+            <div className="space-y-1.5">
+              {warehouses.map(w => {
+                const qty = dist[w.id] ?? 0
+                return (
+                  <div key={w.id} className="flex items-center justify-between p-2 bg-muted/40 rounded-md text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-mono text-[11px]">{w.code}</span>
+                      <span className="text-muted-foreground">— {w.city}</span>
+                      {w.isPrimary && <Badge variant="outline" className="text-[9px] border-amber-400 text-amber-700 h-4 px-1.5">Utama</Badge>}
+                    </span>
+                    <span className={`tabular-nums font-medium ${qty === 0 ? 'text-muted-foreground' : qty <= 5 ? 'text-orange-600' : ''}`}>
+                      {qty} unit
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
           {product.description && (
             <>
               <Separator />
@@ -698,6 +650,8 @@ function ViewProductDialog({
 function ProductFormDialog({
   mode,
   initialData,
+  initialStock,
+  productId,
   open,
   onClose,
   onSave,
@@ -705,28 +659,31 @@ function ProductFormDialog({
 }: {
   mode: 'add' | 'edit'
   initialData: Omit<Product, 'id'>
+  initialStock?: number
+  productId?: number
   open: boolean
   onClose: () => void
-  onSave: (data: Omit<Product, 'id'>) => void
+  onSave: (data: Omit<Product, 'id'>, initialStock?: number) => void
   categories: string[]
 }) {
+  const { warehouses, distributionOf, totalStockOf, primaryWarehouseId } = useInventory()
   const [form, setForm] = useState<Omit<Product, 'id'>>(initialData)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [rawNums, setRawNums] = useState({
     price: initialData.price > 0 ? String(initialData.price) : '',
-    stock: initialData.stock > 0 ? String(initialData.stock) : '',
-    weight: initialData.weight > 0 ? String(initialData.weight) : '',
+    stock: initialStock && initialStock > 0 ? String(initialStock) : '',
+    weight: (initialData.weight ?? 0) > 0 ? String(initialData.weight) : '',
   })
 
   useEffect(() => {
     if (open) {
       setRawNums({
         price: initialData.price > 0 ? String(initialData.price) : '',
-        stock: initialData.stock > 0 ? String(initialData.stock) : '',
-        weight: initialData.weight > 0 ? String(initialData.weight) : '',
+        stock: initialStock && initialStock > 0 ? String(initialStock) : '',
+        weight: (initialData.weight ?? 0) > 0 ? String(initialData.weight) : '',
       })
     }
-  }, [open, initialData])
+  }, [open, initialData, initialStock])
 
   const set = (field: keyof Omit<Product, 'id'>, value: string | number) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -734,7 +691,9 @@ function ProductFormDialog({
   const setRaw = (field: 'price' | 'stock' | 'weight', val: string) => {
     const digits = val.replace(/\D/g, '')
     setRawNums(prev => ({ ...prev, [field]: digits }))
-    set(field, digits === '' ? 0 : Number(digits))
+    if (field !== 'stock') {
+      set(field, digits === '' ? 0 : Number(digits))
+    }
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -748,7 +707,12 @@ function ProductFormDialog({
 
   const handleSave = () => {
     if (!form.name.trim() || !form.sku.trim() || !form.category) return
-    onSave({ ...form, status: deriveStatus(Number(form.stock)) })
+    if (mode === 'add') {
+      const stock = Number(rawNums.stock) || 0
+      onSave(form, stock)
+    } else {
+      onSave(form)
+    }
     onClose()
   }
 
@@ -756,6 +720,9 @@ function ProductFormDialog({
     if (o) setForm(initialData)
     else onClose()
   }
+
+  const primaryWh = warehouses.find(w => w.id === primaryWarehouseId)
+  const editDist = mode === 'edit' && typeof productId === 'number' ? distributionOf(productId) : null
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -848,18 +815,30 @@ function ProductFormDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="p-stock">Stok</Label>
-              <Input
-                id="p-stock"
-                type="text"
-                inputMode="numeric"
-                value={rawNums.stock}
-                onChange={e => setRaw('stock', e.target.value)}
-                onFocus={e => e.target.select()}
-                placeholder="0"
-              />
-            </div>
+            {mode === 'add' ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="p-stock">
+                  Stok Awal
+                  {primaryWh && <span className="text-xs text-muted-foreground ml-1">(di {primaryWh.code})</span>}
+                </Label>
+                <Input
+                  id="p-stock"
+                  type="text"
+                  inputMode="numeric"
+                  value={rawNums.stock}
+                  onChange={e => setRaw('stock', e.target.value)}
+                  onFocus={e => e.target.select()}
+                  placeholder="0"
+                />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Total Stok Saat Ini</Label>
+                <div className="h-10 px-3 flex items-center rounded-md border bg-muted/30 text-sm tabular-nums">
+                  {typeof productId === 'number' ? totalStockOf(productId) : 0} unit
+                </div>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="p-weight">Berat (gram)</Label>
               <Input
@@ -873,6 +852,32 @@ function ProductFormDialog({
               />
             </div>
           </div>
+
+          {/* Edit mode: per-warehouse breakdown */}
+          {mode === 'edit' && editDist && (
+            <div className="space-y-1.5 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Warehouse className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-blue-900">Distribusi stok per gudang</p>
+                  <p className="text-[11px] text-blue-700 mb-2">
+                    Untuk mengubah stok, gunakan menu <strong>Gudang → Penyesuaian Stok</strong> atau <strong>Transfer Stok</strong>.
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {warehouses.map(w => {
+                      const qty = editDist[w.id] ?? 0
+                      return (
+                        <div key={w.id} className="flex items-center justify-between text-xs bg-white/70 px-2 py-1 rounded">
+                          <span className="font-mono text-[10px] text-muted-foreground">{w.code}</span>
+                          <span className="tabular-nums font-medium">{qty}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="p-desc">Deskripsi</Label>
@@ -901,20 +906,36 @@ function ProductFormDialog({
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function ProductManagement() {
-  const [products, setProducts] = useState<Product[]>(initialProducts)
+export function ProductManagement({
+  initialAction,
+  onActionConsumed,
+}: {
+  initialAction?: 'add' | null
+  onActionConsumed?: () => void
+} = {}) {
+  const {
+    products, warehouses, totalStockOf, primaryWarehouseId,
+    addProduct, updateProduct, deleteProduct, bulkAddProducts,
+  } = useInventory()
+
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // dialog state
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
+
+  useEffect(() => {
+    if (initialAction === 'add') {
+      setIsAddOpen(true)
+      onActionConsumed?.()
+    }
+  }, [initialAction, onActionConsumed])
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -929,39 +950,16 @@ export function ProductManagement() {
   const startItem = filtered.length === 0 ? 0 : isShowAll ? 1 : (page - 1) * effectiveSize + 1
   const endItem = isShowAll ? filtered.length : Math.min(page * effectiveSize, filtered.length)
 
-  // ── CRUD ──
-  const handleAdd = (data: Omit<Product, 'id'>) => {
-    const newId = Math.max(0, ...products.map(p => p.id)) + 1
-    setProducts(prev => [...prev, { id: newId, ...data }])
-  }
-
-  const handleBulkImport = (rows: Omit<Product, 'id'>[]) => {
-    let nextId = Math.max(0, ...products.map(p => p.id)) + 1
-    const newProducts = rows.map(r => ({ id: nextId++, ...r }))
-    setProducts(prev => [...prev, ...newProducts])
-  }
-
-  const handleEdit = (data: Omit<Product, 'id'>) => {
-    if (!editProduct) return
-    setProducts(prev => prev.map(p => p.id === editProduct.id ? { ...p, ...data } : p))
-  }
-
-  const handleDelete = () => {
-    if (!deleteProduct) return
-    setProducts(prev => prev.filter(p => p.id !== deleteProduct.id))
-    setDeleteProduct(null)
-  }
+  const primaryWh = warehouses.find(w => w.id === primaryWarehouseId)
 
   // ── Category rename propagation ──
   const handleCategoriesChange = (newCats: string[]) => {
-    const oldNames = categories
-    // if a category was renamed, update all products using it
-    oldNames.forEach((oldName, idx) => {
+    categories.forEach((oldName, idx) => {
       const newName = newCats[idx]
       if (newName && newName !== oldName) {
-        setProducts(prev => prev.map(p =>
-          p.category === oldName ? { ...p, category: newName } : p
-        ))
+        products
+          .filter(p => p.category === oldName)
+          .forEach(p => updateProduct(p.id, { ...p, category: newName }))
       }
     })
     setCategories(newCats)
@@ -969,27 +967,37 @@ export function ProductManagement() {
 
   // ── Export Excel ──
   const handleExport = () => {
-    const rows = filtered.map(p => ({
-      'ID': p.id,
-      'Nama Produk': p.name,
-      'SKU': p.sku,
-      'Kategori': p.category,
-      'Harga (Rp)': p.price,
-      'Stok': p.stock,
-      'Berat (gram)': p.weight ?? '',
-      'Status': p.stock === 0 ? 'Habis' : p.stock <= 5 ? 'Stok Rendah' : 'Aktif',
-      'Deskripsi': p.description ?? '',
-    }))
+    const rows = filtered.map(p => {
+      const stock = totalStockOf(p.id)
+      return {
+        'ID': p.id,
+        'Nama Produk': p.name,
+        'SKU': p.sku,
+        'Kategori': p.category,
+        'Harga (Rp)': p.price,
+        'Total Stok': stock,
+        'Berat (gram)': p.weight ?? '',
+        'Status': stock === 0 ? 'Habis' : stock <= 5 ? 'Stok Rendah' : 'Aktif',
+        'Deskripsi': p.description ?? '',
+      }
+    })
 
     const ws = XLSX.utils.json_to_sheet(rows)
     ws['!cols'] = [
       { wch: 5 }, { wch: 30 }, { wch: 18 }, { wch: 14 },
-      { wch: 16 }, { wch: 8 }, { wch: 13 }, { wch: 12 }, { wch: 40 },
+      { wch: 16 }, { wch: 10 }, { wch: 13 }, { wch: 12 }, { wch: 40 },
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Produk')
     XLSX.writeFile(wb, `produk-toko-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
+
+  const activeCount = products.filter(p => totalStockOf(p.id) > 5).length
+  const lowCount = products.filter(p => {
+    const s = totalStockOf(p.id)
+    return s > 0 && s <= 5
+  }).length
+  const outCount = products.filter(p => totalStockOf(p.id) === 0).length
 
   return (
     <div className="space-y-6">
@@ -997,7 +1005,9 @@ export function ProductManagement() {
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-2xl font-bold">Manajemen Produk</h1>
-          <p className="text-muted-foreground">Kelola semua produk yang Anda jual di toko online Anda</p>
+          <p className="text-muted-foreground">
+            Kelola semua produk yang Anda jual. Stok dihitung otomatis dari distribusi di tiap gudang.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
@@ -1037,7 +1047,7 @@ export function ProductManagement() {
             <Package className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{products.filter(p => p.stock > 5).length}</div>
+            <div className="text-2xl font-bold">{activeCount}</div>
             <p className="text-xs text-muted-foreground">dengan stok cukup</p>
           </CardContent>
         </Card>
@@ -1047,7 +1057,7 @@ export function ProductManagement() {
             <AlertTriangle className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{products.filter(p => p.stock <= 5 && p.stock > 0).length}</div>
+            <div className="text-2xl font-bold">{lowCount}</div>
             <p className="text-xs text-muted-foreground">perlu restock</p>
           </CardContent>
         </Card>
@@ -1057,7 +1067,7 @@ export function ProductManagement() {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{products.filter(p => p.stock === 0).length}</div>
+            <div className="text-2xl font-bold">{outCount}</div>
             <p className="text-xs text-muted-foreground">segera restock</p>
           </CardContent>
         </Card>
@@ -1095,71 +1105,74 @@ export function ProductManagement() {
                     <TableHead>Produk</TableHead>
                     <TableHead>Kategori</TableHead>
                     <TableHead>Harga</TableHead>
-                    <TableHead>Stok</TableHead>
+                    <TableHead>Stok (Total)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paged.map(product => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ImageWithFallback
-                            src={product.image}
-                            alt={product.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                  {paged.map(product => {
+                    const stock = totalStockOf(product.id)
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <ImageWithFallback
+                              src={product.image}
+                              alt={product.name}
+                              className="w-12 h-12 rounded-lg object-cover"
+                            />
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{product.category}</TableCell>
-                      <TableCell>{formatPrice(product.price)}</TableCell>
-                      <TableCell>
-                        <span className={
-                          product.stock === 0 ? 'text-red-600 font-medium' :
-                          product.stock <= 5 ? 'text-orange-600 font-medium' : ''
-                        }>
-                          {product.stock}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge stock={product.stock} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Lihat detail"
-                            onClick={() => setViewProduct(product)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Edit produk"
-                            onClick={() => setEditProduct(product)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Hapus produk"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => setDeleteProduct(product)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>{product.category}</TableCell>
+                        <TableCell>{formatPrice(product.price)}</TableCell>
+                        <TableCell>
+                          <span className={
+                            stock === 0 ? 'text-red-600 font-medium' :
+                            stock <= 5 ? 'text-orange-600 font-medium' : ''
+                          }>
+                            {stock}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge stock={stock} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Lihat detail"
+                              onClick={() => setViewProduct(product)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Edit produk"
+                              onClick={() => setEditProduct(product)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Hapus produk"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setDeletingProduct(product)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
 
@@ -1237,9 +1250,10 @@ export function ProductManagement() {
         key={isAddOpen ? 'add-open' : 'add-closed'}
         mode="add"
         initialData={emptyForm}
+        initialStock={0}
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        onSave={handleAdd}
+        onSave={(data, stock) => addProduct(data, stock ?? 0)}
         categories={categories}
       />
 
@@ -1247,12 +1261,11 @@ export function ProductManagement() {
         <ProductFormDialog
           key={`edit-${editProduct.id}`}
           mode="edit"
+          productId={editProduct.id}
           initialData={{
             name: editProduct.name,
             category: editProduct.category,
             price: editProduct.price,
-            stock: editProduct.stock,
-            status: editProduct.status,
             image: editProduct.image,
             sku: editProduct.sku,
             weight: editProduct.weight ?? 0,
@@ -1260,7 +1273,7 @@ export function ProductManagement() {
           }}
           open={!!editProduct}
           onClose={() => setEditProduct(null)}
-          onSave={handleEdit}
+          onSave={data => updateProduct(editProduct.id, data)}
           categories={categories}
         />
       )}
@@ -1268,8 +1281,9 @@ export function ProductManagement() {
       <ImportDialog
         open={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onImport={handleBulkImport}
+        onImport={bulkAddProducts}
         categories={categories}
+        primaryWarehouseName={primaryWh ? `${primaryWh.code} — ${primaryWh.name}` : '—'}
       />
 
       <CategoryManagementDialog
@@ -1280,19 +1294,22 @@ export function ProductManagement() {
         products={products}
       />
 
-      <AlertDialog open={!!deleteProduct} onOpenChange={open => !open && setDeleteProduct(null)}>
+      <AlertDialog open={!!deletingProduct} onOpenChange={open => !open && setDeletingProduct(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Produk</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus <strong>{deleteProduct?.name}</strong>?
-              Tindakan ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus <strong>{deletingProduct?.name}</strong>?
+              Stok di semua gudang akan ikut dihapus. Tindakan ini tidak dapat dibatalkan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={() => {
+                if (deletingProduct) deleteProduct(deletingProduct.id)
+                setDeletingProduct(null)
+              }}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Ya, Hapus

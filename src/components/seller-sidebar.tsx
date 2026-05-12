@@ -2,7 +2,7 @@ import { useState, useEffect, type ElementType } from 'react'
 import {
   LayoutDashboard, Package, ShoppingCart, BarChart3, Settings,
   Store, Users, CreditCard, Bell, HelpCircle, LogOut,
-  AlertTriangle, Handshake, Megaphone, UserCog,
+  AlertTriangle, Handshake, Megaphone, UserCog, Warehouse,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { cn } from "./ui/utils"
@@ -23,6 +23,7 @@ interface SellerSidebarProps {
 const mainNavItems: { id: FeatureKey; label: string; icon: ElementType }[] = [
   { id: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
   { id: 'products',   label: 'Produk',     icon: Package },
+  { id: 'warehouse',  label: 'Gudang',     icon: Warehouse },
   { id: 'orders',     label: 'Pesanan',    icon: ShoppingCart },
   { id: 'analytics',  label: 'Analitik',   icon: BarChart3 },
   { id: 'customers',  label: 'Pelanggan',  icon: Users },

@@ -146,7 +146,7 @@ function PriceTooltip({ active, payload, label }: any) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function DashboardOverview() {
+export function DashboardOverview({ onAddProduct }: { onAddProduct?: () => void } = {}) {
   // Announcements
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
   const visibleAnnouncements = announcements.filter(a => !a.dismissed)
@@ -179,7 +179,7 @@ export function DashboardOverview() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Selamat datang kembali! Berikut ringkasan toko Anda hari ini.</p>
         </div>
-        <Button className="flex items-center gap-2">
+        <Button onClick={onAddProduct} className="flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Tambah Produk
         </Button>
