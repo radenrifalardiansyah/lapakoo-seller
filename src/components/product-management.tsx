@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -712,9 +712,30 @@ function ProductFormDialog({
 }) {
   const [form, setForm] = useState<Omit<Product, 'id'>>(initialData)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [rawNums, setRawNums] = useState({
+    price: initialData.price > 0 ? String(initialData.price) : '',
+    stock: initialData.stock > 0 ? String(initialData.stock) : '',
+    weight: initialData.weight > 0 ? String(initialData.weight) : '',
+  })
+
+  useEffect(() => {
+    if (open) {
+      setRawNums({
+        price: initialData.price > 0 ? String(initialData.price) : '',
+        stock: initialData.stock > 0 ? String(initialData.stock) : '',
+        weight: initialData.weight > 0 ? String(initialData.weight) : '',
+      })
+    }
+  }, [open, initialData])
 
   const set = (field: keyof Omit<Product, 'id'>, value: string | number) =>
     setForm(prev => ({ ...prev, [field]: value }))
+
+  const setRaw = (field: 'price' | 'stock' | 'weight', val: string) => {
+    const digits = val.replace(/\D/g, '')
+    setRawNums(prev => ({ ...prev, [field]: digits }))
+    set(field, digits === '' ? 0 : Number(digits))
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -816,10 +837,11 @@ function ProductFormDialog({
               <Label htmlFor="p-price">Harga (Rp)</Label>
               <Input
                 id="p-price"
-                type="number"
-                min={0}
-                value={form.price}
-                onChange={e => set('price', Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={rawNums.price}
+                onChange={e => setRaw('price', e.target.value)}
+                onFocus={e => e.target.select()}
                 placeholder="0"
               />
             </div>
@@ -830,10 +852,11 @@ function ProductFormDialog({
               <Label htmlFor="p-stock">Stok</Label>
               <Input
                 id="p-stock"
-                type="number"
-                min={0}
-                value={form.stock}
-                onChange={e => set('stock', Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={rawNums.stock}
+                onChange={e => setRaw('stock', e.target.value)}
+                onFocus={e => e.target.select()}
                 placeholder="0"
               />
             </div>
@@ -841,10 +864,11 @@ function ProductFormDialog({
               <Label htmlFor="p-weight">Berat (gram)</Label>
               <Input
                 id="p-weight"
-                type="number"
-                min={0}
-                value={form.weight}
-                onChange={e => set('weight', Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={rawNums.weight}
+                onChange={e => setRaw('weight', e.target.value)}
+                onFocus={e => e.target.select()}
                 placeholder="0"
               />
             </div>

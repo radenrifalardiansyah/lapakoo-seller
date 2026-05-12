@@ -1,8 +1,88 @@
--- Seller Management System Database Schema
+-- Seller Management System Database Schema (Multi-Tenant SaaS)
 
 -- Create database
 CREATE DATABASE IF NOT EXISTS seller_management;
 USE seller_management;
+
+-- ─── Packages (subscription plans) ──────────────────────────────────────────
+
+CREATE TABLE packages (
+    id          VARCHAR(50)  PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    description TEXT,
+    price       DECIMAL(15,2) DEFAULT 0,
+    -- Feature flags
+    feat_dashboard     BOOLEAN DEFAULT TRUE,
+    feat_products      BOOLEAN DEFAULT TRUE,
+    feat_orders        BOOLEAN DEFAULT TRUE,
+    feat_analytics     BOOLEAN DEFAULT FALSE,
+    feat_customers     BOOLEAN DEFAULT FALSE,
+    feat_resellers     BOOLEAN DEFAULT FALSE,
+    feat_marketing     BOOLEAN DEFAULT FALSE,
+    feat_payments      BOOLEAN DEFAULT FALSE,
+    feat_notifications BOOLEAN DEFAULT TRUE,
+    feat_settings      BOOLEAN DEFAULT TRUE,
+    feat_help          BOOLEAN DEFAULT TRUE,
+    -- Limits (-1 = unlimited)
+    max_products INT DEFAULT 50,
+    max_orders   INT DEFAULT 100,
+    max_users    INT DEFAULT 1,
+    is_active    BOOLEAN DEFAULT TRUE,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO packages (id, name, description, price, feat_analytics, feat_customers, feat_marketing, feat_payments, max_products, max_orders, max_users) VALUES
+('starter',  'Starter',  'Paket dasar untuk toko baru',         99000,  FALSE, FALSE, FALSE, FALSE, 50,   100,  1),
+('pro',      'Pro',      'Fitur lengkap untuk toko berkembang',  299000, TRUE,  TRUE,  TRUE,  TRUE,  500,  -1,   5),
+('business', 'Business', 'Semua fitur termasuk reseller',        599000, TRUE,  TRUE,  TRUE,  TRUE,  -1,   -1,  -1);
+
+-- Update business package to include resellers
+UPDATE packages SET feat_resellers = TRUE WHERE id = 'business';
+
+-- ─── Tenants (clients / stores) ──────────────────────────────────────────────
+
+CREATE TABLE tenants (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    subdomain     VARCHAR(100) UNIQUE NOT NULL,
+    store_name    VARCHAR(255) NOT NULL,
+    owner_name    VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) UNIQUE NOT NULL,
+    phone         VARCHAR(20),
+    logo_url      VARCHAR(255),
+    primary_color VARCHAR(7) DEFAULT '#6366f1',
+    package_id    VARCHAR(50) NOT NULL DEFAULT 'starter',
+    status        ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
+    trial_ends_at TIMESTAMP NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (package_id) REFERENCES packages(id),
+    INDEX idx_subdomain (subdomain),
+    INDEX idx_status (status)
+);
+
+INSERT INTO tenants (subdomain, store_name, owner_name, email, primary_color, package_id) VALUES
+('demo',     'Toko Demo',          'Admin Demo',   'demo@seller.id',        '#6366f1', 'starter'),
+('tokobudi', 'Toko Budi Jaya',     'Budi Santoso', 'budi@tokobudi.seller.id', '#0ea5e9', 'pro'),
+('abcstore', 'ABC Store Official', 'Ahmad Rizki',  'admin@abcstore.seller.id','#10b981', 'business');
+
+-- ─── Tenant users (staff per tenant) ─────────────────────────────────────────
+
+CREATE TABLE tenant_users (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id  INT NOT NULL,
+    name       VARCHAR(255) NOT NULL,
+    email      VARCHAR(255) NOT NULL,
+    password   VARCHAR(255) NOT NULL,
+    role       ENUM('owner', 'admin', 'staff') DEFAULT 'staff',
+    status     ENUM('active', 'inactive') DEFAULT 'active',
+    last_login TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_tenant_email (tenant_id, email),
+    INDEX idx_tenant_id (tenant_id)
+);
 
 -- Sellers table
 CREATE TABLE sellers (

@@ -283,11 +283,12 @@ function TierSettingsDialog({
                     <Label className="text-xs">Komisi (%)</Label>
                     <div className="flex items-center">
                       <Input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={d.commission}
-                        onChange={e => setField(tier, 'commission', e.target.value)}
+                        type="text"
+                        inputMode="numeric"
+                        value={d.commission === 0 ? '' : d.commission}
+                        onChange={e => setField(tier, 'commission', e.target.value.replace(/\D/g, ''))}
+                        onFocus={e => e.target.select()}
+                        placeholder="0"
                         className="rounded-r-none"
                       />
                       <span className="px-3 h-9 flex items-center bg-muted border border-l-0 rounded-r-md text-sm text-muted-foreground">%</span>
@@ -298,11 +299,12 @@ function TierSettingsDialog({
                   <div className="space-y-1.5">
                     <Label className="text-xs">Min. Penjualan (Rp)</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      value={d.minSales}
+                      type="text"
+                      inputMode="numeric"
+                      value={d.minSales === 0 ? '' : d.minSales}
                       disabled={idx === 0}
-                      onChange={e => setField(tier, 'minSales', e.target.value)}
+                      onChange={e => setField(tier, 'minSales', e.target.value.replace(/\D/g, ''))}
+                      onFocus={e => e.target.select()}
                       placeholder="0"
                     />
                     <p className="text-[10px] text-muted-foreground">{idx === 0 ? 'Selalu Rp 0' : formatPrice(d.minSales)}</p>

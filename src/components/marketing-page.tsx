@@ -320,9 +320,10 @@ function VoucherFormDialog({
                   {form.type === 'percentage' ? '%' : 'Rp'}
                 </span>
                 <Input
-                  type="number" min={0}
+                  type="text" inputMode="numeric"
                   value={form.value}
-                  onChange={e => set('value', e.target.value)}
+                  onChange={e => set('value', e.target.value.replace(/\D/g, ''))}
+                  onFocus={e => e.target.select()}
                   placeholder={form.type === 'percentage' ? '10' : '50000'}
                   className="rounded-l-none"
                 />
@@ -334,15 +335,17 @@ function VoucherFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Min. Pembelian (Rp)</Label>
-              <Input type="number" min={0} value={form.minPurchase}
-                onChange={e => set('minPurchase', e.target.value)} placeholder="0" />
+              <Input type="text" inputMode="numeric" value={form.minPurchase}
+                onChange={e => set('minPurchase', e.target.value.replace(/\D/g, ''))}
+                onFocus={e => e.target.select()} placeholder="0" />
               {form.minPurchase && <p className="text-[10px] text-muted-foreground">{formatPrice(Number(form.minPurchase))}</p>}
             </div>
             {form.type === 'percentage' && (
               <div className="space-y-1.5">
                 <Label>Maks. Diskon (Rp)</Label>
-                <Input type="number" min={0} value={form.maxDiscount}
-                  onChange={e => set('maxDiscount', e.target.value)} placeholder="Opsional" />
+                <Input type="text" inputMode="numeric" value={form.maxDiscount}
+                  onChange={e => set('maxDiscount', e.target.value.replace(/\D/g, ''))}
+                  onFocus={e => e.target.select()} placeholder="Opsional" />
                 {form.maxDiscount && <p className="text-[10px] text-muted-foreground">{formatPrice(Number(form.maxDiscount))}</p>}
               </div>
             )}
@@ -351,8 +354,9 @@ function VoucherFormDialog({
           {/* Quota */}
           <div className="space-y-1.5">
             <Label>Kuota Penggunaan <span className="text-red-500">*</span></Label>
-            <Input type="number" min={1} value={form.quota}
-              onChange={e => set('quota', e.target.value)} placeholder="100" />
+            <Input type="text" inputMode="numeric" value={form.quota}
+              onChange={e => set('quota', e.target.value.replace(/\D/g, ''))}
+              onFocus={e => e.target.select()} placeholder="100" />
           </div>
 
           {/* Dates */}
@@ -530,13 +534,15 @@ function FlashSaleFormDialog({
                 </Select>
                 <div className="flex items-center">
                   <span className="px-2 h-9 flex items-center bg-background border border-r-0 rounded-l-md text-xs text-muted-foreground">Rp</span>
-                  <Input type="number" min={1} value={addSalePrice}
-                    onChange={e => { setAddSalePrice(e.target.value); setAddError('') }}
+                  <Input type="text" inputMode="numeric" value={addSalePrice}
+                    onChange={e => { setAddSalePrice(e.target.value.replace(/\D/g, '')); setAddError('') }}
+                    onFocus={e => e.target.select()}
                     placeholder="Harga flash" className="rounded-l-none" />
                 </div>
                 <div className="flex gap-2">
-                  <Input type="number" min={1} value={addQuota}
-                    onChange={e => { setAddQuota(e.target.value); setAddError('') }}
+                  <Input type="text" inputMode="numeric" value={addQuota}
+                    onChange={e => { setAddQuota(e.target.value.replace(/\D/g, '')); setAddError('') }}
+                    onFocus={e => e.target.select()}
                     placeholder="Kuota" />
                   <Button type="button" size="sm" onClick={handleAddItem} className="shrink-0">
                     <Plus className="w-4 h-4" />
