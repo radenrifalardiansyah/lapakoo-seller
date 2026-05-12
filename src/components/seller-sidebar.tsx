@@ -9,6 +9,7 @@ import { cn } from "./ui/utils"
 import { useTenant } from '../contexts/TenantContext'
 import type { FeatureKey } from '../types/tenant'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { getPackageTheme } from '../lib/packageTheme'
 
 interface SellerSidebarProps {
   activeTab: string
@@ -71,6 +72,8 @@ export function SellerSidebar({
   }
 
   const primaryColor = tenant?.primaryColor ?? '#6366f1'
+  const theme = getPackageTheme(tenant?.package.id)
+  const PkgIcon = theme.icon
 
   const NavItem = ({ id, label, icon: Icon }: { id: string; label: string; icon: ElementType }) => {
     const isActive = activeTab === id
@@ -130,6 +133,9 @@ export function SellerSidebar({
         isDesktopCollapsed ? "w-64 md:w-16" : "w-64"
       )}>
 
+        {/* Tier ribbon — gradient strip identifying the package tier */}
+        <div className={cn("h-1 w-full shrink-0 bg-gradient-to-r", theme.gradient)} />
+
         {/* Logo / Store branding */}
         <div className={cn(
           "flex items-center border-b border-gray-100",
@@ -145,9 +151,13 @@ export function SellerSidebar({
             <p className="text-sm font-bold text-gray-900 leading-tight truncate">
               {tenant?.storeName ?? 'Seller Center'}
             </p>
-            <p className="text-xs font-medium leading-tight truncate" style={{ color: primaryColor }}>
-              Paket {tenant?.package.name ?? '—'}
-            </p>
+            <span className={cn(
+              "inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold leading-none",
+              theme.chipClass
+            )}>
+              <PkgIcon className="w-3 h-3" />
+              {tenant?.package.name ?? '—'}
+            </span>
           </div>
           <button
             className="hidden md:flex w-6 h-6 items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
@@ -176,17 +186,21 @@ export function SellerSidebar({
 
         {/* Quick Stats */}
         <div
-          className={cn("mx-3 mb-3 rounded-xl border p-3 space-y-2", isDesktopCollapsed && "md:hidden")}
-          style={{ backgroundColor: `${primaryColor}08`, borderColor: `${primaryColor}20` }}
+          className={cn(
+            "mx-3 mb-3 rounded-xl border p-3 space-y-2 relative overflow-hidden",
+            isDesktopCollapsed && "md:hidden"
+          )}
+          style={{ backgroundColor: `${theme.accent}0D`, borderColor: `${theme.accent}33` }}
         >
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: primaryColor }}>Hari Ini</p>
+          <div className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r", theme.gradient)} />
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.accent }}>Hari Ini</p>
           <div className="flex justify-between items-center">
             <span className="text-xs text-gray-500">Penjualan</span>
-            <span className="text-xs font-bold" style={{ color: primaryColor }}>Rp 2.5jt</span>
+            <span className="text-xs font-bold" style={{ color: theme.accent }}>Rp 2.5jt</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-xs text-gray-500">Pesanan Baru</span>
-            <span className="text-xs font-bold" style={{ color: primaryColor }}>5</span>
+            <span className="text-xs font-bold" style={{ color: theme.accent }}>5</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-xs text-amber-600 flex items-center gap-1">
