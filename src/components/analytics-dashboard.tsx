@@ -135,8 +135,8 @@ export function AnalyticsDashboard() {
                 <Icon className={`h-4 w-4 ${item.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{item.value}</div>
-                <p className={`text-xs flex items-center gap-1 mt-1 ${item.up ? 'text-green-600' : 'text-red-500'}`}>
+                <div className="text-2xl font-bold text-right tabular-nums">{item.value}</div>
+                <p className={`text-xs flex items-center justify-end gap-1 mt-1 tabular-nums ${item.up ? 'text-green-600' : 'text-red-500'}`}>
                   {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {item.trend} dari periode sebelumnya
                 </p>
@@ -187,14 +187,14 @@ export function AnalyticsDashboard() {
               <CardContent className="space-y-4">
                 {topProductsData.map((p, i) => (
                   <div key={i}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div>
-                        <p className="text-sm font-medium">{p.nama}</p>
-                        <p className="text-xs text-muted-foreground">{p.pesanan} pesanan</p>
+                    <div className="flex items-center justify-between mb-1 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{p.nama}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">{p.pesanan} pesanan</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">{formatPrice(p.penjualan)}</p>
-                        <Badge variant="secondary" className="text-xs">{p.persentase}%</Badge>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold tabular-nums">{formatPrice(p.penjualan)}</p>
+                        <Badge variant="secondary" className="text-xs tabular-nums">{p.persentase}%</Badge>
                       </div>
                     </div>
                     <div className="w-full bg-muted rounded-full h-1.5">
@@ -323,16 +323,16 @@ export function AnalyticsDashboard() {
                 <tbody>
                   {topProductsData.map((p, i) => (
                     <tr key={i} className="border-b last:border-0">
-                      <td className="py-3 text-muted-foreground">{i + 1}</td>
+                      <td className="py-3 text-muted-foreground tabular-nums">{i + 1}</td>
                       <td className="py-3 font-medium">{p.nama}</td>
-                      <td className="py-3 text-right">{p.pesanan}</td>
-                      <td className="py-3 text-right">{formatPrice(p.penjualan)}</td>
+                      <td className="py-3 text-right tabular-nums">{p.pesanan}</td>
+                      <td className="py-3 text-right tabular-nums">{formatPrice(p.penjualan)}</td>
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="w-16 bg-muted rounded-full h-1.5">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${p.persentase}%` }} />
                           </div>
-                          <span>{p.persentase}%</span>
+                          <span className="tabular-nums">{p.persentase}%</span>
                         </div>
                       </td>
                     </tr>
@@ -441,7 +441,7 @@ export function AnalyticsDashboard() {
                             {item.sumber}
                           </div>
                         </td>
-                        <td className="py-3 text-right text-muted-foreground">
+                        <td className="py-3 text-right text-muted-foreground tabular-nums">
                           {Math.round(item.pengunjung * 18.9).toLocaleString('id-ID')}
                         </td>
                         <td className="py-3 text-right">
@@ -449,7 +449,7 @@ export function AnalyticsDashboard() {
                             <div className="w-16 bg-muted rounded-full h-1.5">
                               <div className="h-1.5 rounded-full" style={{ width: `${item.pengunjung}%`, backgroundColor: item.color }} />
                             </div>
-                            <span>{item.pengunjung}%</span>
+                            <span className="tabular-nums">{item.pengunjung}%</span>
                           </div>
                         </td>
                       </tr>

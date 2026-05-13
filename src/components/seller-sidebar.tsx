@@ -1,9 +1,9 @@
-import { useState, useEffect, type ElementType } from 'react'
+import { useState, type ElementType } from 'react'
 import {
   LayoutDashboard, Package, ShoppingCart, BarChart3, Settings,
   Store, Users, CreditCard, Bell, HelpCircle, LogOut,
   AlertTriangle, Handshake, Megaphone, UserCog, Warehouse,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ChevronDown, Brain,
 } from 'lucide-react'
 import { cn } from "./ui/utils"
 import { useTenant } from '../contexts/TenantContext'
@@ -27,6 +27,7 @@ const mainNavItems: { id: FeatureKey; label: string; icon: ElementType }[] = [
   { id: 'warehouse',  label: 'Gudang',     icon: Warehouse },
   { id: 'orders',     label: 'Pesanan',    icon: ShoppingCart },
   { id: 'analytics',  label: 'Analitik',   icon: BarChart3 },
+  { id: 'ai-insights', label: 'Bisnis AI', icon: Brain },
   { id: 'customers',  label: 'Pelanggan',  icon: Users },
   { id: 'resellers',  label: 'Reseller',   icon: Handshake },
   { id: 'marketing',  label: 'Pemasaran',  icon: Megaphone },
@@ -44,21 +45,24 @@ export function SellerSidebar({
   activeTab, onTabChange, onLogout,
   productBadge, orderBadge, resellerBadge, marketingBadge,
 }: SellerSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(true)
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
+  const [isTodayCollapsed, setIsTodayCollapsed] = useState(
+    () => localStorage.getItem('sidebar-today-collapsed') === 'true'
+  )
   const { tenant, hasFeature } = useTenant()
-
-  useEffect(() => {
-    const handler = () => setIsCollapsed(v => !v)
-    window.addEventListener('toggle-sidebar', handler)
-    return () => window.removeEventListener('toggle-sidebar', handler)
-  }, [])
 
   const toggleDesktop = () => {
     setIsDesktopCollapsed(v => {
       localStorage.setItem('sidebar-collapsed', String(!v))
+      return !v
+    })
+  }
+
+  const toggleToday = () => {
+    setIsTodayCollapsed(v => {
+      localStorage.setItem('sidebar-today-collapsed', String(!v))
       return !v
     })
   }
@@ -80,7 +84,7 @@ export function SellerSidebar({
     const badge = badgeFor(id)
     const btn = (
       <button
-        onClick={() => { onTabChange(id); setIsCollapsed(true) }}
+        onClick={() => onTabChange(id)}
         className={cn(
           "w-full flex items-center rounded-lg text-sm transition-all duration-150",
           isDesktopCollapsed ? "px-3 py-2.5 gap-3 md:justify-center md:px-0 md:gap-0" : "gap-3 px-3 py-2.5",
@@ -122,15 +126,10 @@ export function SellerSidebar({
 
   return (
     <>
-      {!isCollapsed && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setIsCollapsed(true)} />
-      )}
-
       <div className={cn(
-        "fixed md:relative left-0 top-0 z-50 h-screen flex flex-col bg-white border-r border-gray-100",
-        "transition-all duration-300 ease-in-out md:translate-x-0",
-        isCollapsed ? "-translate-x-full" : "translate-x-0",
-        isDesktopCollapsed ? "w-64 md:w-16" : "w-64"
+        "hidden md:flex relative left-0 top-0 z-50 h-screen flex-col bg-white border-r border-gray-100",
+        "transition-all duration-300 ease-in-out",
+        isDesktopCollapsed ? "md:w-16" : "md:w-64"
       )}>
 
         {/* Tier ribbon — gradient strip identifying the package tier */}
@@ -187,28 +186,47 @@ export function SellerSidebar({
         {/* Quick Stats */}
         <div
           className={cn(
-            "mx-3 mb-3 rounded-xl border p-3 space-y-2 relative overflow-hidden",
+            "mx-3 mb-3 rounded-xl border relative overflow-hidden",
+            isTodayCollapsed ? "p-2" : "p-3 space-y-2",
             isDesktopCollapsed && "md:hidden"
           )}
           style={{ backgroundColor: `${theme.accent}0D`, borderColor: `${theme.accent}33` }}
         >
           <div className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r", theme.gradient)} />
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.accent }}>Hari Ini</p>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">Penjualan</span>
-            <span className="text-xs font-bold" style={{ color: theme.accent }}>Rp 2.5jt</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">Pesanan Baru</span>
-            <span className="text-xs font-bold" style={{ color: theme.accent }}>5</span>
-          </div>
-          {hasFeature('low-stock-alerts') && (
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-amber-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />Stok Rendah
-              </span>
-              <span className="text-xs font-bold text-amber-600">12</span>
-            </div>
+          <button
+            onClick={toggleToday}
+            className="w-full flex items-center justify-between cursor-pointer"
+            aria-expanded={!isTodayCollapsed}
+            title={isTodayCollapsed ? 'Perluas' : 'Ciutkan'}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.accent }}>Hari Ini</p>
+            <ChevronDown
+              className={cn(
+                "w-3.5 h-3.5 transition-transform duration-200",
+                isTodayCollapsed && "-rotate-90"
+              )}
+              style={{ color: theme.accent }}
+            />
+          </button>
+          {!isTodayCollapsed && (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Penjualan</span>
+                <span className="text-xs font-bold" style={{ color: theme.accent }}>Rp 2.5jt</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Pesanan Baru</span>
+                <span className="text-xs font-bold" style={{ color: theme.accent }}>5</span>
+              </div>
+              {hasFeature('low-stock-alerts') && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-amber-600 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />Stok Rendah
+                  </span>
+                  <span className="text-xs font-bold text-amber-600">12</span>
+                </div>
+              )}
+            </>
           )}
         </div>
 

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -22,7 +23,7 @@ import {
 import {
   Warehouse, Plus, Edit, Trash2, MapPin, Phone, User, Lock,
   ArrowRightLeft, SlidersHorizontal, History, Check, X, Package,
-  AlertTriangle, ArrowDown, ArrowUp, Star, Search, FileSpreadsheet,
+  AlertTriangle, ArrowDown, ArrowUp, Star, Search, FileSpreadsheet, FileText,
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 import { useInventory } from '../contexts/InventoryContext'
@@ -658,6 +659,105 @@ export function WarehouseManagement() {
     XLSX.writeFile(wb, `gudang-${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  // ── Export PDF (per active tab) ──
+  const handleExportPdf = () => {
+    if (activeTab === 'warehouses') {
+      exportPdf({
+        fileName: `gudang-${fileStamp()}`,
+        title: 'Daftar Gudang',
+        subtitle: 'Lokasi penyimpanan dan PIC',
+        storeName: tenant?.storeName,
+        orientation: 'landscape',
+        summary: [
+          { label: 'Total Gudang', value: String(filteredWarehouses.length) },
+          { label: 'Aktif', value: String(filteredWarehouses.filter(w => w.active).length) },
+          { label: 'Total Stok', value: filteredWarehouses.reduce((s, w) => s + (stockByWarehouse[w.id] ?? 0), 0).toLocaleString('id-ID') + ' unit' },
+        ],
+        columns: [
+          { header: 'Kode', width: 18 },
+          { header: 'Nama Gudang', width: 48 },
+          { header: 'Kota', width: 30 },
+          { header: 'PIC', width: 36 },
+          { header: 'Telepon', width: 30 },
+          { header: 'Total Stok', width: 24, align: 'right' },
+          { header: 'Utama', width: 16, align: 'center' },
+          { header: 'Status', width: 22, align: 'center' },
+        ],
+        rows: filteredWarehouses.map(w => [
+          w.code,
+          w.name,
+          w.city,
+          w.pic,
+          w.phone,
+          (stockByWarehouse[w.id] ?? 0).toLocaleString('id-ID'),
+          w.isPrimary ? 'Ya' : '—',
+          w.active ? 'Aktif' : 'Nonaktif',
+        ]),
+      })
+      return
+    }
+    if (activeTab === 'stock') {
+      exportPdf({
+        fileName: `stok-gudang-${fileStamp()}`,
+        title: 'Stok per Gudang',
+        subtitle: 'Distribusi stok produk di seluruh gudang',
+        storeName: tenant?.storeName,
+        orientation: 'landscape',
+        summary: [
+          { label: 'Produk', value: String(filteredStockProducts.length) },
+          { label: 'Gudang', value: String(warehouses.length) },
+        ],
+        columns: [
+          { header: 'Produk', width: 60 },
+          { header: 'SKU', width: 30 },
+          ...warehouses.map(w => ({ header: w.code, width: 22, align: 'right' as const })),
+          { header: 'Total', width: 22, align: 'right' as const },
+        ],
+        rows: filteredStockProducts.map(p => {
+          const perWh = distribution[p.id] ?? {}
+          const total = Object.values(perWh).reduce((s, n) => s + n, 0)
+          return [
+            p.name,
+            p.sku,
+            ...warehouses.map(w => (perWh[w.id] ?? 0).toLocaleString('id-ID')),
+            total.toLocaleString('id-ID'),
+          ]
+        }),
+      })
+      return
+    }
+    exportPdf({
+      fileName: `pergerakan-stok-${fileStamp()}`,
+      title: 'Riwayat Pergerakan Stok',
+      subtitle: 'Mutasi masuk, keluar, dan transfer antar-gudang',
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Pergerakan', value: String(filteredMovements.length) },
+      ],
+      columns: [
+        { header: 'Waktu', width: 30 },
+        { header: 'Tipe', width: 22 },
+        { header: 'Produk', width: 50 },
+        { header: 'Gudang', width: 32 },
+        { header: 'Tujuan/Asal', width: 32 },
+        { header: 'Qty', width: 18, align: 'right' },
+        { header: 'Alasan', width: 36 },
+        { header: 'Oleh', width: 24 },
+      ],
+      rows: filteredMovements.map(m => [
+        formatDateTime(m.date),
+        MOVEMENT_LABEL[m.type].label,
+        m.productName,
+        m.warehouseName,
+        m.refWarehouseName ?? '—',
+        m.qty.toLocaleString('id-ID'),
+        m.reason,
+        m.by,
+      ]),
+    })
+  }
+
   const emptyForm: Omit<WarehouseLocation, 'id'> = {
     code: '', name: '', address: '', city: '', pic: '', phone: '',
     isPrimary: warehouses.length === 0, active: true,
@@ -675,6 +775,11 @@ export function WarehouseManagement() {
           {hasFeature('export-data') && (
             <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4" />Export Excel
+            </Button>
+          )}
+          {hasFeature('export-pdf') && (
+            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />Export PDF
             </Button>
           )}
           <Button variant="outline" onClick={() => setIsAdjustOpen(true)} disabled={activeCount === 0}>
@@ -729,42 +834,42 @@ export function WarehouseManagement() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Gudang</CardTitle>
-            <Warehouse className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Gudang</CardTitle>
+            <Warehouse className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{warehouses.length}</div>
-            <p className="text-xs text-muted-foreground">{activeCount} aktif</p>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{warehouses.length}</div>
+            <p className="text-xs text-muted-foreground tabular-nums">{activeCount} aktif</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stok</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Stok</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStock.toLocaleString('id-ID')}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{totalStock.toLocaleString('id-ID')}</div>
             <p className="text-xs text-muted-foreground">unit di semua gudang</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produk Terdaftar</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Produk Terdaftar</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{products.length}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{products.length}</div>
             <p className="text-xs text-muted-foreground">SKU di sistem</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pergerakan Stok</CardTitle>
-            <History className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Pergerakan Stok</CardTitle>
+            <History className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{movements.length}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{movements.length}</div>
             <p className="text-xs text-muted-foreground">transaksi tercatat</p>
           </CardContent>
         </Card>

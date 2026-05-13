@@ -208,15 +208,15 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
             {businessSummary.map((item, i) => {
               const Icon = item.icon
               return (
-                <div key={i} className="p-4 rounded-xl border bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <Icon className={`w-4 h-4 ${item.color}`} />
+                <div key={i} className="p-4 rounded-xl border bg-muted/20 space-y-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground truncate">{item.label}</p>
+                    <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
                   </div>
-                  <p className="text-xl font-bold">{item.value}</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">{item.prev}</p>
-                    <span className={`flex items-center gap-0.5 text-xs font-semibold ${item.up ? 'text-green-600' : 'text-red-500'}`}>
+                  <p className="text-xl font-bold text-right tabular-nums truncate">{item.value}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground tabular-nums truncate">{item.prev}</p>
+                    <span className={`flex items-center gap-0.5 text-xs font-semibold tabular-nums shrink-0 ${item.up ? 'text-green-600' : 'text-red-500'}`}>
                       {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                       {item.pct}
                     </span>
@@ -235,15 +235,15 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
               {targetProgress.map((t, i) => {
                 const pct = Math.min(100, Math.round((t.current / t.target) * 100))
                 return (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{t.label}</span>
-                      <span className="font-semibold">{pct}%</span>
+                  <div key={i} className="space-y-1.5 min-w-0">
+                    <div className="flex justify-between text-sm gap-2">
+                      <span className="text-muted-foreground truncate">{t.label}</span>
+                      <span className="font-semibold tabular-nums shrink-0">{pct}%</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div className={`${t.color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground tabular-nums text-right truncate">
                       {typeof t.current === 'number' && t.current > 1000
                         ? `${formatPrice(t.current)} / ${formatPrice(t.target)}`
                         : `${t.current} / ${t.target}`}
@@ -321,8 +321,8 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
                     <p className="text-sm truncate">{order.product}</p>
                     <p className="text-xs text-muted-foreground">{order.date}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">{formatPrice(order.amount)}</p>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold tabular-nums">{formatPrice(order.amount)}</p>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium mt-0.5 ${s.class}`}>
                       {s.label}
                     </span>

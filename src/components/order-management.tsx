@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -17,7 +18,7 @@ import {
 } from "./ui/pagination"
 import {
   Search, Eye, Truck, Package, CheckCircle, Clock,
-  ShoppingCart, TrendingUp, AlertCircle, FileSpreadsheet,
+  ShoppingCart, TrendingUp, AlertCircle, FileSpreadsheet, FileText,
   MapPin, Phone, Mail, Hash, Calendar, X, ChevronRight,
   MessageCircle, Printer, Ban, RotateCcw, CheckSquare, Square,
   ThumbsUp, ThumbsDown, Send
@@ -377,7 +378,7 @@ function BulkShipDialog({
                       onChange={e => setResiMap(prev => ({ ...prev, [o.id]: e.target.value }))}
                     />
                   </div>
-                  <div className="text-xs font-medium text-right shrink-0 mt-1">
+                  <div className="text-xs font-medium text-right shrink-0 mt-1 tabular-nums whitespace-nowrap">
                     {formatPrice(o.total)}
                   </div>
                 </div>
@@ -453,13 +454,13 @@ function CancelOrderDialog({
             </div>
             <div className="divide-y max-h-36 overflow-y-auto">
               {orders.map(o => (
-                <div key={o.id} className="flex items-center justify-between px-3 py-2.5">
-                  <div>
-                    <p className="font-mono text-sm font-medium">{o.id}</p>
-                    <p className="text-xs text-muted-foreground">{o.customer.name}</p>
+                <div key={o.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-medium truncate">{o.id}</p>
+                    <p className="text-xs text-muted-foreground truncate">{o.customer.name}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{formatPrice(o.total)}</p>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-medium tabular-nums whitespace-nowrap">{formatPrice(o.total)}</p>
                     <StatusBadge status={o.status} />
                   </div>
                 </div>
@@ -568,9 +569,9 @@ function ReturDialog({
         <div className="space-y-4">
           {/* Order info */}
           <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
-            <div className="flex justify-between">
-              <span className="font-mono font-medium">{order.id}</span>
-              <span className="font-medium">{formatPrice(order.total)}</span>
+            <div className="flex justify-between gap-2">
+              <span className="font-mono font-medium truncate">{order.id}</span>
+              <span className="font-medium tabular-nums whitespace-nowrap shrink-0">{formatPrice(order.total)}</span>
             </div>
             <p className="text-muted-foreground">{order.customer.name}</p>
             <p className="text-xs text-muted-foreground">
@@ -900,16 +901,16 @@ function OrderDetailDialog({
                   {order.items.map((item, i) => (
                     <tr key={i} className="border-t">
                       <td className="px-4 py-3">{item.name}</td>
-                      <td className="px-4 py-3 text-center text-muted-foreground">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{formatPrice(item.price)}</td>
-                      <td className="px-4 py-3 text-right font-medium">{formatPrice(item.price * item.quantity)}</td>
+                      <td className="px-4 py-3 text-center text-muted-foreground tabular-nums">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">{formatPrice(item.price)}</td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap">{formatPrice(item.price * item.quantity)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="border-t bg-muted/30">
                   <tr>
                     <td colSpan={3} className="px-4 py-3 text-right font-semibold">Total</td>
-                    <td className="px-4 py-3 text-right font-bold text-primary">{formatPrice(subtotal)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-primary tabular-nums whitespace-nowrap">{formatPrice(subtotal)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1005,7 +1006,7 @@ function OrdersTable({
           {bulkEnabled && <TableHead className="w-8"></TableHead>}
           <TableHead>Pesanan</TableHead>
           <TableHead>Pelanggan</TableHead>
-          <TableHead>Total</TableHead>
+          <TableHead className="text-right">Total</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Pembayaran</TableHead>
           <TableHead>Tanggal</TableHead>
@@ -1052,7 +1053,7 @@ function OrdersTable({
                 <p className="font-medium text-sm">{order.customer.name}</p>
                 <p className="text-xs text-muted-foreground">{order.customer.email}</p>
               </TableCell>
-              <TableCell className="font-medium whitespace-nowrap">{formatPrice(order.total)}</TableCell>
+              <TableCell className="font-medium whitespace-nowrap text-right tabular-nums">{formatPrice(order.total)}</TableCell>
               <TableCell><StatusBadge status={order.status} /></TableCell>
               <TableCell><PaymentBadge status={order.paymentStatus} /></TableCell>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -1109,7 +1110,7 @@ function OrdersTable({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function OrderManagement() {
-  const { hasFeature } = useTenant()
+  const { hasFeature, tenant } = useTenant()
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all')
@@ -1258,6 +1259,43 @@ export function OrderManagement() {
     XLSX.writeFile(wb, `pesanan-${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  const handleExportPdf = () => {
+    const data = filterOrders(activeTab === 'all' ? undefined : activeTab)
+    const totalOmzet = data.reduce((sum, o) => sum + o.total, 0)
+
+    exportPdf({
+      fileName: `pesanan-${activeTab}-${fileStamp()}`,
+      title: 'Daftar Pesanan',
+      subtitle: `Filter: ${activeTab === 'all' ? 'Semua status' : (STATUS_CONFIG[activeTab as OrderStatus]?.label ?? activeTab)}`,
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Pesanan', value: String(data.length) },
+        { label: 'Total Omzet', value: formatRupiah(totalOmzet) },
+        { label: 'Filter', value: activeTab === 'all' ? 'Semua' : (STATUS_CONFIG[activeTab as OrderStatus]?.label ?? activeTab) },
+      ],
+      columns: [
+        { header: 'No. Pesanan', width: 28 },
+        { header: 'Pelanggan', width: 38 },
+        { header: 'Produk', width: 70 },
+        { header: 'Total', width: 28, align: 'right' },
+        { header: 'Status', width: 22 },
+        { header: 'Bayar', width: 22 },
+        { header: 'Tanggal', width: 24 },
+      ],
+      rows: data.map(o => [
+        o.id,
+        `${o.customer.name}\n${o.customer.email}`,
+        o.items.map(i => `${i.name} x${i.quantity}`).join(', '),
+        formatRupiah(o.total),
+        STATUS_CONFIG[o.status].label,
+        PAYMENT_CONFIG[o.paymentStatus].label,
+        formatDate(o.orderDate),
+      ]),
+      footnote: 'Daftar pesanan diekspor dari Eleven Seller',
+    })
+  }
+
   const TABS = [
     { value: 'all',        label: 'Semua',     count: stats.total },
     { value: 'pending',    label: 'Menunggu',   count: stats.pending },
@@ -1276,53 +1314,61 @@ export function OrderManagement() {
           <h1 className="text-2xl font-bold">Manajemen Pesanan</h1>
           <p className="text-muted-foreground">Kelola dan pantau semua pesanan yang masuk dari pelanggan</p>
         </div>
-        {hasFeature('export-data') && (
-          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2 shrink-0">
-            <FileSpreadsheet className="w-4 h-4" />
-            Export Excel
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {hasFeature('export-data') && (
+            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Export Excel
+            </Button>
+          )}
+          {hasFeature('export-pdf') && (
+            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pesanan</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Pesanan</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</div>
             <p className="text-xs text-muted-foreground">semua pesanan</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Perlu Diproses</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Perlu Diproses</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.pending + stats.processing}</div>
+            <div className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending + stats.processing}</div>
             <p className="text-xs text-muted-foreground">menunggu & diproses</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sedang Dikirim</CardTitle>
-            <Truck className="h-4 w-4 text-indigo-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Sedang Dikirim</CardTitle>
+            <Truck className="h-4 w-4 text-indigo-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">{stats.shipped}</div>
+            <div className="text-2xl font-bold text-indigo-600 text-right tabular-nums truncate">{stats.shipped}</div>
             <p className="text-xs text-muted-foreground">dalam perjalanan</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pendapatan</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Pendapatan</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatPrice(stats.revenue)}</div>
+            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.revenue)}</div>
             <p className="text-xs text-muted-foreground">dari pesanan lunas</p>
           </CardContent>
         </Card>

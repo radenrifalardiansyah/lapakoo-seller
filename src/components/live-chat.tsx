@@ -190,7 +190,7 @@ export function LiveChat() {
       {/* ── Chat Panel ── */}
       {open && (
         <div
-          className={`fixed bottom-24 right-6 z-50 w-[340px] bg-background border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-[height] duration-300 ease-in-out ${
+          className={`fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-6 z-40 w-[calc(100vw-2rem)] max-w-[340px] bg-background border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-[height] duration-300 ease-in-out ${
             minimized ? 'h-[60px]' : 'h-[510px]'
           }`}
         >
@@ -345,7 +345,7 @@ export function LiveChat() {
       {/* ── Floating Button ── */}
       <button
         onClick={open ? () => { setOpen(false) } : handleOpen}
-        className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center ${
+        className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center ${
           !open && unread > 0 ? 'ring-4 ring-primary/30 ring-offset-2' : ''
         }`}
         title={open ? 'Tutup chat' : 'Buka live chat'}

@@ -7,6 +7,7 @@ import { ProductManagement } from "./components/product-management";
 import { WarehouseManagement } from "./components/warehouse-management";
 import { OrderManagement, initialOrders } from "./components/order-management";
 import { AnalyticsDashboard } from "./components/analytics-dashboard";
+import { AIInsightsPage } from "./components/ai-insights-page";
 import { CustomersPage } from "./components/customers-page";
 import { PaymentsPage } from "./components/payments-page";
 import { LoginPage } from "./components/login-page";
@@ -18,10 +19,12 @@ import { HelpPage } from "./components/help-page";
 import { TeamPage } from "./components/team-page";
 import { LiveChat } from "./components/live-chat";
 import { UserProfileDialog } from "./components/user-profile-dialog";
+import { MobileHeader } from "./components/mobile-header";
+import { MobileBottomNav } from "./components/mobile-bottom-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
-import { Bell, LogOut, Menu, Store, AlertTriangle, ChevronDown } from "lucide-react";
+import { Bell, LogOut, Store, AlertTriangle, ChevronDown } from "lucide-react";
 
 function NotificationsPage() {
   const { hasFeature } = useTenant();
@@ -162,6 +165,7 @@ function AppInner() {
       case "warehouse":     return <WarehouseManagement />;
       case "orders":        return <OrderManagement />;
       case "analytics":     return <AnalyticsDashboard />;
+      case "ai-insights":   return <AIInsightsPage />;
       case "customers":     return <CustomersPage />;
       case "resellers":     return <ResellerPage />;
       case "marketing":     return <MarketingPage />;
@@ -198,28 +202,13 @@ function AppInner() {
         marketingBadge={marketingBadge}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-gray-100 bg-white px-4 md:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden -ml-1 shrink-0 hover:bg-gray-100"
-              onClick={() => window.dispatchEvent(new Event('toggle-sidebar'))}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="md:hidden flex items-center gap-2.5 min-w-0">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <Store className="w-4 h-4" />
-              </div>
-              <h2 className="text-sm font-bold text-gray-900 leading-tight truncate">
-                {tenant?.storeName ?? 'Seller Management'}
-              </h2>
-            </div>
-          </div>
+        <MobileHeader
+          userEmail={userEmail}
+          hasNotifications={(orderBadge + productBadge + resellerBadge + marketingBadge) > 0}
+          onProfileClick={() => setShowProfile(true)}
+          onNotificationsClick={() => setActiveTab('notifications')}
+        />
+        <header className="hidden md:flex border-b border-gray-100 bg-white px-4 md:px-6 py-3 items-center justify-end">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -248,9 +237,20 @@ function AppInner() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">
-          <div className="p-6">{renderContent()}</div>
+          <div className="p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
+            {renderContent()}
+          </div>
         </main>
       </div>
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onLogout={handleLogout}
+        productBadge={productBadge}
+        orderBadge={orderBadge}
+        resellerBadge={resellerBadge}
+        marketingBadge={marketingBadge}
+      />
       <LiveChat />
       <UserProfileDialog
         open={showProfile}

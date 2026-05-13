@@ -13,12 +13,15 @@ export type FeatureKey =
   | 'help'
   | 'team'
   | 'export-data'
+  | 'export-pdf'
+  | 'customer-history-detail'
   | 'bulk-import'
   | 'stock-transfer'
   | 'bulk-actions'
   | 'advanced-notifications'
   | 'low-stock-alerts'
-  | 'two-factor-auth';
+  | 'two-factor-auth'
+  | 'ai-insights';
 
 export interface Package {
   id: string;

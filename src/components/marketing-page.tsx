@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -21,7 +22,7 @@ import {
 import {
   Megaphone, Plus, Search, Edit, Trash2, Tag, Zap,
   Copy, CheckCircle, XCircle, Clock, Timer, Flame,
-  TrendingUp, BadgePercent, FileSpreadsheet, AlertCircle,
+  TrendingUp, BadgePercent, FileSpreadsheet, FileText, AlertCircle,
   Package, Power, RefreshCw, ChevronDown, ChevronUp,
   Calendar, Ban,
 } from 'lucide-react'
@@ -334,20 +335,20 @@ function VoucherFormDialog({
 
           {/* Min purchase + Max discount */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label>Min. Pembelian (Rp)</Label>
               <Input type="text" inputMode="numeric" value={form.minPurchase}
                 onChange={e => set('minPurchase', e.target.value.replace(/\D/g, ''))}
                 onFocus={e => e.target.select()} placeholder="0" />
-              {form.minPurchase && <p className="text-[10px] text-muted-foreground">{formatPrice(Number(form.minPurchase))}</p>}
+              {form.minPurchase && <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.minPurchase))}</p>}
             </div>
             {form.type === 'percentage' && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label>Maks. Diskon (Rp)</Label>
                 <Input type="text" inputMode="numeric" value={form.maxDiscount}
                   onChange={e => set('maxDiscount', e.target.value.replace(/\D/g, ''))}
                   onFocus={e => e.target.select()} placeholder="Opsional" />
-                {form.maxDiscount && <p className="text-[10px] text-muted-foreground">{formatPrice(Number(form.maxDiscount))}</p>}
+                {form.maxDiscount && <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.maxDiscount))}</p>}
               </div>
             )}
           </div>
@@ -497,14 +498,14 @@ function FlashSaleFormDialog({
                   <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{item.productName}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground tabular-nums truncate">
                         Normal: {formatPrice(item.originalPrice)} →
                         <span className="text-red-600 font-semibold ml-1">{formatPrice(item.salePrice)}</span>
                         <span className="ml-1 text-green-600">(-{discountPct(item.originalPrice, item.salePrice)}%)</span>
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs text-muted-foreground">Kuota: <strong>{item.quota}</strong></p>
+                      <p className="text-xs text-muted-foreground tabular-nums">Kuota: <strong>{item.quota}</strong></p>
                     </div>
                     <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 h-7 px-2"
                       onClick={() => removeItem(item.productId)}>
@@ -670,15 +671,15 @@ function FlashSaleCard({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-xs truncate">{item.productName}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-muted-foreground line-through text-[10px]">{formatPrice(item.originalPrice)}</span>
-                    <span className="text-red-600 font-bold text-xs">{formatPrice(item.salePrice)}</span>
-                    <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                    <span className="text-muted-foreground line-through text-[10px] tabular-nums whitespace-nowrap">{formatPrice(item.originalPrice)}</span>
+                    <span className="text-red-600 font-bold text-xs tabular-nums whitespace-nowrap">{formatPrice(item.salePrice)}</span>
+                    <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-semibold tabular-nums">
                       -{discountPct(item.originalPrice, item.salePrice)}%
                     </span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs font-medium">{item.sold}/{item.quota}</p>
+                  <p className="text-xs font-medium tabular-nums">{item.sold}/{item.quota}</p>
                   <p className="text-[10px] text-muted-foreground">terjual</p>
                 </div>
               </div>
@@ -693,7 +694,7 @@ function FlashSaleCard({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function MarketingPage() {
-  const { hasFeature } = useTenant()
+  const { hasFeature, tenant } = useTenant()
   const [vouchers, setVouchers]       = useState<Voucher[]>(initialVouchers)
   const [flashSales, setFlashSales]   = useState<FlashSale[]>(initialFlashSales)
   const [activeTab, setActiveTab]     = useState('vouchers')
@@ -831,6 +832,45 @@ export function MarketingPage() {
     XLSX.writeFile(wb, `voucher-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  const handleExportVouchersPdf = () => {
+    const totalQuota = filteredVouchers.reduce((s, v) => s + v.quota, 0)
+    const totalUsed = filteredVouchers.reduce((s, v) => s + v.used, 0)
+
+    exportPdf({
+      fileName: `voucher-${fileStamp()}`,
+      title: 'Daftar Voucher',
+      subtitle: 'Voucher & program diskon toko',
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Voucher', value: String(filteredVouchers.length) },
+        { label: 'Total Kuota', value: totalQuota.toLocaleString('id-ID') },
+        { label: 'Terpakai', value: totalUsed.toLocaleString('id-ID') },
+      ],
+      columns: [
+        { header: 'Kode', width: 26 },
+        { header: 'Nama', width: 55 },
+        { header: 'Tipe', width: 22 },
+        { header: 'Nilai', width: 26, align: 'right' },
+        { header: 'Min. Beli', width: 26, align: 'right' },
+        { header: 'Kuota / Pakai', width: 22, align: 'right' },
+        { header: 'Berlaku', width: 36 },
+        { header: 'Status', width: 22 },
+      ],
+      rows: filteredVouchers.map(v => [
+        v.code,
+        v.name,
+        v.type === 'percentage' ? 'Persentase' : 'Nominal',
+        v.type === 'percentage' ? `${v.value}%` : formatRupiah(v.value),
+        v.minPurchase > 0 ? formatRupiah(v.minPurchase) : '—',
+        `${v.used} / ${v.quota}`,
+        `${formatDate(v.startDate)}\ns/d ${formatDate(v.endDate)}`,
+        VOUCHER_STATUS_CFG[getVoucherStatus(v)].label,
+      ]),
+      footnote: 'Daftar voucher diekspor dari Eleven Seller',
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -931,7 +971,12 @@ export function MarketingPage() {
                   </Select>
                   {hasFeature('export-data') && (
                     <Button variant="outline" onClick={handleExportVouchers}>
-                      <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
+                      <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
+                    </Button>
+                  )}
+                  {hasFeature('export-pdf') && (
+                    <Button variant="outline" onClick={handleExportVouchersPdf}>
+                      <FileText className="w-4 h-4 mr-1.5" />PDF
                     </Button>
                   )}
                   <Button onClick={() => setAddVoucherOpen(true)}>
@@ -952,8 +997,8 @@ export function MarketingPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Kode &amp; Nama</TableHead>
-                        <TableHead>Tipe</TableHead>
-                        <TableHead>Min. Beli</TableHead>
+                        <TableHead className="text-right">Tipe</TableHead>
+                        <TableHead className="text-right">Min. Beli</TableHead>
                         <TableHead className="text-center">Penggunaan</TableHead>
                         <TableHead>Berlaku</TableHead>
                         <TableHead>Status</TableHead>
@@ -980,24 +1025,24 @@ export function MarketingPage() {
                                 <p className="text-xs text-muted-foreground">{v.name}</p>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-right">
                               <div className="text-sm">
                                 {v.type === 'percentage' ? (
-                                  <span className="text-blue-700 font-semibold">{v.value}%</span>
+                                  <span className="text-blue-700 font-semibold tabular-nums">{v.value}%</span>
                                 ) : (
-                                  <span className="text-green-700 font-semibold">{formatPrice(v.value)}</span>
+                                  <span className="text-green-700 font-semibold tabular-nums whitespace-nowrap">{formatPrice(v.value)}</span>
                                 )}
                                 {v.maxDiscount !== null && (
-                                  <p className="text-[10px] text-muted-foreground">maks. {formatPrice(v.maxDiscount)}</p>
+                                  <p className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">maks. {formatPrice(v.maxDiscount)}</p>
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
+                            <TableCell className="text-sm text-muted-foreground text-right tabular-nums whitespace-nowrap">
                               {v.minPurchase > 0 ? formatPrice(v.minPurchase) : '—'}
                             </TableCell>
                             <TableCell>
                               <div className="text-center">
-                                <p className="text-sm font-medium">{v.used}/{v.quota}</p>
+                                <p className="text-sm font-medium tabular-nums">{v.used}/{v.quota}</p>
                                 <div className="h-1.5 bg-muted rounded-full overflow-hidden w-16 mx-auto mt-1">
                                   <div className="h-full bg-primary rounded-full" style={{ width: `${pctUsed}%` }} />
                                 </div>

@@ -559,34 +559,34 @@ export function SettingsPage() {
 
           {/* Config */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label>Gratis Ongkir Mulai (Rp)</Label>
               {shippingEditing ? (
                 <>
                   <Input type="number" min={0} value={shippingDraft.freeShippingMin}
                     onChange={e => setShippingDraft(p => ({ ...p, freeShippingMin: e.target.value }))} />
                   {shippingDraft.freeShippingMin && (
-                    <p className="text-[10px] text-muted-foreground">{formatPrice(Number(shippingDraft.freeShippingMin))}</p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(shippingDraft.freeShippingMin))}</p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground py-2">
+                <p className="text-sm text-muted-foreground py-2 tabular-nums truncate">
                   {shipping.freeShippingMin === "0" || !shipping.freeShippingMin ? "Tidak ada" : formatPrice(Number(shipping.freeShippingMin))}
                 </p>
               )}
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label>Biaya Kemasan (Rp)</Label>
               {shippingEditing ? (
                 <>
                   <Input type="number" min={0} value={shippingDraft.packagingFee}
                     onChange={e => setShippingDraft(p => ({ ...p, packagingFee: e.target.value }))} />
                   {shippingDraft.packagingFee && (
-                    <p className="text-[10px] text-muted-foreground">{formatPrice(Number(shippingDraft.packagingFee))}</p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(shippingDraft.packagingFee))}</p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground py-2">
+                <p className="text-sm text-muted-foreground py-2 tabular-nums truncate">
                   {shipping.packagingFee ? formatPrice(Number(shipping.packagingFee)) : "Rp 0"}
                 </p>
               )}

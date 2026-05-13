@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -18,7 +19,7 @@ import {
 } from 'recharts'
 import {
   Wallet, TrendingUp, TrendingDown, ArrowDownToLine, Clock,
-  CheckCircle, XCircle, Search, FileSpreadsheet,
+  CheckCircle, XCircle, Search, FileSpreadsheet, FileText,
   CreditCard, Building2, AlertCircle, ReceiptText,
   ChevronDown, ChevronUp, Minus,
 } from 'lucide-react'
@@ -381,7 +382,7 @@ function WithdrawDialog({ open, onClose, balance }: { open: boolean; onClose: ()
 const AVAILABLE_YEARS = [2022, 2023, 2024]
 
 export function PaymentsPage() {
-  const { hasFeature } = useTenant()
+  const { hasFeature, tenant } = useTenant()
   // ── existing state ──
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -453,6 +454,52 @@ export function PaymentsPage() {
     XLSX.writeFile(wb, `laporan-penghasilan-${reportMode === 'yearly' ? reportYear : `${reportYear}-${String(reportMonth).padStart(2,'0')}`}.xlsx`)
   }
 
+  const handleExportReportPdf = () => {
+    exportPdf({
+      fileName: `laporan-penghasilan-${reportMode === 'yearly' ? reportYear : `${reportYear}-${String(reportMonth).padStart(2,'0')}`}`,
+      title: 'Laporan Penghasilan',
+      subtitle: reportPeriodLabel,
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Omzet', value: formatRupiah(summary.omzet) },
+        { label: 'Biaya Admin', value: formatRupiah(summary.adminFee) },
+        { label: 'Net Income', value: formatRupiah(summary.netIncome) },
+        { label: 'Total Pesanan', value: summary.orders.toLocaleString('id-ID') },
+      ],
+      columns: [
+        { header: reportMode === 'monthly' ? 'Tanggal' : 'Bulan', width: 32 },
+        { header: 'Omzet', width: 36, align: 'right' },
+        { header: 'Biaya Admin (2%)', width: 36, align: 'right' },
+        { header: 'Refund', width: 32, align: 'right' },
+        { header: 'Net Income', width: 36, align: 'right' },
+        { header: 'Pesanan', width: 22, align: 'right' },
+        { header: 'Margin', width: 22, align: 'right' },
+      ],
+      rows: [
+        ...reportRows.map(r => [
+          r.period,
+          formatRupiah(r.omzet),
+          `− ${formatRupiah(r.adminFee)}`,
+          r.refund > 0 ? `− ${formatRupiah(r.refund)}` : '—',
+          formatRupiah(r.netIncome),
+          r.orders.toLocaleString('id-ID'),
+          r.omzet > 0 ? `${((r.netIncome / r.omzet) * 100).toFixed(1)}%` : '0.0%',
+        ]),
+        [
+          'TOTAL',
+          formatRupiah(summary.omzet),
+          `− ${formatRupiah(summary.adminFee)}`,
+          summary.refund > 0 ? `− ${formatRupiah(summary.refund)}` : '—',
+          formatRupiah(summary.netIncome),
+          summary.orders.toLocaleString('id-ID'),
+          summary.omzet > 0 ? `${((summary.netIncome / summary.omzet) * 100).toFixed(1)}%` : '0.0%',
+        ],
+      ],
+      footnote: 'Laporan penghasilan diekspor dari Eleven Seller',
+    })
+  }
+
   // ── transactions ──
   const filtered = mockTransactions.filter(tx => {
     const matchSearch =
@@ -486,6 +533,40 @@ export function PaymentsPage() {
     XLSX.writeFile(wb, `transaksi-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  const handleExportTxPdf = () => {
+    const totalIn = filtered.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+    const totalOut = filtered.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+
+    exportPdf({
+      fileName: `transaksi-${fileStamp()}`,
+      title: 'Riwayat Transaksi',
+      subtitle: typeFilter === 'all' ? 'Semua jenis transaksi' : `Filter: ${typeFilter}`,
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Transaksi', value: String(filtered.length) },
+        { label: 'Total Masuk', value: formatRupiah(totalIn) },
+        { label: 'Total Keluar', value: formatRupiah(totalOut) },
+      ],
+      columns: [
+        { header: 'ID Transaksi', width: 28 },
+        { header: 'Tanggal', width: 28 },
+        { header: 'Keterangan', width: 80 },
+        { header: 'Jenis', width: 26 },
+        { header: 'Jumlah', width: 34, align: 'right' },
+        { header: 'Status', width: 22, align: 'center' },
+      ],
+      rows: filtered.map(tx => [
+        tx.id,
+        formatDate(tx.date),
+        tx.description,
+        tx.type,
+        `${tx.amount < 0 ? '−' : '+'}${formatRupiah(Math.abs(tx.amount))}`,
+        tx.status,
+      ]),
+    })
+  }
+
   // chart data: limit to last 15 items for monthly (avoid clutter), all for yearly
   const chartData = reportMode === 'monthly'
     ? reportRows.filter((_, i) => i % 2 === 0)   // every other day to reduce clutter
@@ -507,7 +588,7 @@ export function PaymentsPage() {
             <Wallet className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <div className="text-lg xl:text-2xl font-bold text-green-600 truncate leading-tight">{formatPrice(balance)}</div>
+            <div className="text-lg xl:text-2xl font-bold text-green-600 truncate leading-tight tabular-nums text-right">{formatPrice(balance)}</div>
             <Button size="sm" className="w-full mt-auto pt-0" onClick={() => setIsWithdrawOpen(true)}>
               <ArrowDownToLine className="w-3.5 h-3.5 mr-1.5" />Tarik Saldo
             </Button>
@@ -519,7 +600,7 @@ export function PaymentsPage() {
             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <div className="text-lg xl:text-2xl font-bold text-amber-600 truncate leading-tight">{formatPrice(12_800_000)}</div>
+            <div className="text-lg xl:text-2xl font-bold text-amber-600 truncate leading-tight tabular-nums text-right">{formatPrice(12_800_000)}</div>
             <p className="text-xs text-muted-foreground mt-auto pt-2">Dicairkan dalam 1–3 hari kerja</p>
           </CardContent>
         </Card>
@@ -529,7 +610,7 @@ export function PaymentsPage() {
             <TrendingUp className="h-4 w-4 text-blue-500 shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <div className="text-lg xl:text-2xl font-bold truncate leading-tight">{formatPrice(185_000_000)}</div>
+            <div className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(185_000_000)}</div>
             <p className="text-xs text-muted-foreground mt-auto pt-2 flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-green-500 shrink-0" />+12.5% dari bulan lalu
             </p>
@@ -541,7 +622,7 @@ export function PaymentsPage() {
             <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <div className="text-lg xl:text-2xl font-bold truncate leading-tight">{formatPrice(238_500_000)}</div>
+            <div className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(238_500_000)}</div>
             <p className="text-xs text-muted-foreground mt-auto pt-2">Sepanjang waktu</p>
           </CardContent>
         </Card>
@@ -616,7 +697,13 @@ export function PaymentsPage() {
               {hasFeature('export-data') && (
                 <Button size="sm" variant="outline" onClick={handleExportReport} className="h-8 text-xs">
                   <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-                  Export Laporan
+                  Excel
+                </Button>
+              )}
+              {hasFeature('export-pdf') && (
+                <Button size="sm" variant="outline" onClick={handleExportReportPdf} className="h-8 text-xs">
+                  <FileText className="w-3.5 h-3.5 mr-1.5" />
+                  PDF
                 </Button>
               )}
             </div>
@@ -674,13 +761,13 @@ export function PaymentsPage() {
               const Icon = kpi.icon
               const pct = pctChange(kpi.value, kpi.prev)
               return (
-                <div key={kpi.label} className={`rounded-xl p-4 ${kpi.bg} space-y-2`}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-muted-foreground">{kpi.label}</p>
-                    <Icon className={`w-4 h-4 ${kpi.iconColor}`} />
+                <div key={kpi.label} className={`rounded-xl p-4 ${kpi.bg} space-y-2 min-w-0`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-muted-foreground truncate">{kpi.label}</p>
+                    <Icon className={`w-4 h-4 shrink-0 ${kpi.iconColor}`} />
                   </div>
-                  <p className={`text-xl font-bold ${kpi.color}`}>{formatPrice(kpi.value)}</p>
-                  {kpi.note && <p className="text-xs text-muted-foreground">{kpi.note}</p>}
+                  <p className={`text-xl font-bold text-right tabular-nums truncate ${kpi.color}`}>{formatPrice(kpi.value)}</p>
+                  {kpi.note && <p className="text-xs text-muted-foreground tabular-nums truncate">{kpi.note}</p>}
                   <div className="pt-1 border-t border-black/5">
                     <Trend pct={pct} inverse={kpi.inverse} />
                     <p className="text-[10px] text-muted-foreground mt-0.5">vs {prevPeriodLabel}</p>
@@ -764,18 +851,18 @@ export function PaymentsPage() {
                           : `${row.period} ${reportYear}`
                         }
                       </TableCell>
-                      <TableCell className="text-right text-sm font-medium">{formatPrice(row.omzet)}</TableCell>
-                      <TableCell className="text-right text-sm text-orange-600">
+                      <TableCell className="text-right text-sm font-medium tabular-nums whitespace-nowrap">{formatPrice(row.omzet)}</TableCell>
+                      <TableCell className="text-right text-sm text-orange-600 tabular-nums whitespace-nowrap">
                         − {formatPrice(row.adminFee)}
                       </TableCell>
-                      <TableCell className="text-right text-sm text-red-600">
+                      <TableCell className="text-right text-sm text-red-600 tabular-nums whitespace-nowrap">
                         {row.refund > 0 ? `− ${formatPrice(row.refund)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-green-600">
+                      <TableCell className="text-right text-sm font-semibold text-green-600 tabular-nums whitespace-nowrap">
                         {formatPrice(row.netIncome)}
                       </TableCell>
                       <TableCell className="text-right text-xs">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${
+                        <span className={`px-2 py-0.5 rounded-full font-medium tabular-nums ${
                           margin >= 90 ? 'bg-green-50 text-green-700' :
                           margin >= 80 ? 'bg-amber-50 text-amber-700' :
                           'bg-red-50 text-red-700'
@@ -783,7 +870,7 @@ export function PaymentsPage() {
                           {margin.toFixed(1)}%
                         </span>
                       </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{row.orders}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">{row.orders}</TableCell>
                     </TableRow>
                   )
                 })}
@@ -791,13 +878,13 @@ export function PaymentsPage() {
             </Table>
 
             {/* Subtotal row */}
-            <div className="grid grid-cols-6 gap-0 mt-2 pt-3 border-t text-sm font-semibold">
+            <div className="grid grid-cols-6 gap-2 mt-2 pt-3 border-t text-sm font-semibold">
               <div className="col-span-1 text-muted-foreground">Total</div>
-              <div className="text-right">{formatPrice(summary.omzet)}</div>
-              <div className="text-right text-orange-600">− {formatPrice(summary.adminFee)}</div>
-              <div className="text-right text-red-600">− {formatPrice(summary.refund)}</div>
-              <div className="text-right text-green-600">{formatPrice(summary.netIncome)}</div>
-              <div className="text-right text-muted-foreground">{summary.orders} pesanan</div>
+              <div className="text-right tabular-nums whitespace-nowrap">{formatPrice(summary.omzet)}</div>
+              <div className="text-right text-orange-600 tabular-nums whitespace-nowrap">− {formatPrice(summary.adminFee)}</div>
+              <div className="text-right text-red-600 tabular-nums whitespace-nowrap">− {formatPrice(summary.refund)}</div>
+              <div className="text-right text-green-600 tabular-nums whitespace-nowrap">{formatPrice(summary.netIncome)}</div>
+              <div className="text-right text-muted-foreground tabular-nums whitespace-nowrap">{summary.orders} pesanan</div>
             </div>
 
             {/* Report table pagination */}
@@ -883,7 +970,12 @@ export function PaymentsPage() {
               </Select>
               {hasFeature('export-data') && (
                 <Button variant="outline" onClick={handleExportTx}>
-                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
+                </Button>
+              )}
+              {hasFeature('export-pdf') && (
+                <Button variant="outline" onClick={handleExportTxPdf}>
+                  <FileText className="w-4 h-4 mr-1.5" />PDF
                 </Button>
               )}
             </div>
@@ -904,7 +996,7 @@ export function PaymentsPage() {
                     <TableHead>Tanggal</TableHead>
                     <TableHead>Keterangan</TableHead>
                     <TableHead>Jenis</TableHead>
-                    <TableHead>Jumlah</TableHead>
+                    <TableHead className="text-right">Jumlah</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -923,7 +1015,7 @@ export function PaymentsPage() {
                             {tx.type}
                           </span>
                         </TableCell>
-                        <TableCell className={`font-semibold whitespace-nowrap ${isDebit ? 'text-red-600' : 'text-green-600'}`}>
+                        <TableCell className={`font-semibold whitespace-nowrap text-right tabular-nums ${isDebit ? 'text-red-600' : 'text-green-600'}`}>
                           {isDebit ? '−' : '+'}{formatPrice(tx.amount)}
                         </TableCell>
                         <TableCell>

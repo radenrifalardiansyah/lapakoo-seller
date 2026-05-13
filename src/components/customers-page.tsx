@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -13,17 +13,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Separator } from './ui/separator'
 import {
   Users, Search, Eye, Star, ShoppingBag, Phone, Mail, MapPin, Calendar, TrendingUp,
+  History, FileText, Package, Wallet, BarChart3, Filter,
 } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Segment = 'VIP' | 'Regular' | 'New'
+type OrderStatus = 'delivered' | 'shipped' | 'processing' | 'cancelled'
+type PaymentStatus = 'paid' | 'waiting' | 'refunded'
 
 interface Order {
   id: string
   product: string
   amount: number
   date: string
+  /** Auto-derived for Business analytics. Optional for backward-compat. */
+  category?: string
+  status?: OrderStatus
+  paymentStatus?: PaymentStatus
 }
 
 interface Customer {
@@ -264,6 +273,73 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr))
 }
 
+// ─── Category / status auto-derivation ────────────────────────────────────────
+// Mock data only stores `product` name. To support analitik (kategori favorit,
+// status breakdown), we derive these fields deterministically per order.
+
+const CATEGORY_RULES: Array<{ match: RegExp; category: string }> = [
+  { match: /iphone|samsung|playstation|airpods|controller|buds|tab|fifa|game/i, category: 'Elektronik' },
+  { match: /macbook|kursi|mouse|mousepad/i, category: 'Komputer & Aksesoris' },
+  { match: /nike|adidas|sepatu|raket|shuttlecock|badminton|topi/i, category: 'Olahraga' },
+  { match: /dress|tas|heels|kaos|celana|ikat pinggang|batik|uniqlo|chino/i, category: 'Fashion' },
+  { match: /skincare|lip|wardah|implora|parfum|jo malone|sunglasses|ray-ban/i, category: 'Kecantikan' },
+  { match: /buku|novel/i, category: 'Buku' },
+  { match: /blender|rice cooker|panci|philips|miyako/i, category: 'Rumah Tangga' },
+  { match: /longchamp/i, category: 'Fashion' },
+]
+
+function deriveCategory(product: string): string {
+  for (const rule of CATEGORY_RULES) {
+    if (rule.match.test(product)) return rule.category
+  }
+  return 'Lainnya'
+}
+
+function deriveStatus(orderId: string, dateStr: string): OrderStatus {
+  const ageDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000)
+  if (ageDays > 30) return 'delivered'
+  if (ageDays > 14) return 'delivered'
+  // Use last digit of id for stable variety
+  const tail = Number(orderId.slice(-2)) || 0
+  if (tail % 11 === 0) return 'cancelled'
+  if (ageDays > 7) return 'shipped'
+  if (tail % 5 === 0) return 'processing'
+  return 'delivered'
+}
+
+function derivePaymentStatus(status: OrderStatus, orderId: string): PaymentStatus {
+  if (status === 'cancelled') {
+    const tail = Number(orderId.slice(-2)) || 0
+    return tail % 2 === 0 ? 'refunded' : 'waiting'
+  }
+  if (status === 'processing') return 'waiting'
+  return 'paid'
+}
+
+/** Returns the order with derived fields filled in (idempotent). */
+function enrichOrder(o: Order): Required<Order> {
+  const status = o.status ?? deriveStatus(o.id, o.date)
+  return {
+    ...o,
+    category: o.category ?? deriveCategory(o.product),
+    status,
+    paymentStatus: o.paymentStatus ?? derivePaymentStatus(status, o.id),
+  }
+}
+
+const ORDER_STATUS_CFG: Record<OrderStatus, { label: string; class: string }> = {
+  delivered:  { label: 'Selesai',    class: 'bg-green-50 text-green-700 border-green-200' },
+  shipped:    { label: 'Dikirim',    class: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  processing: { label: 'Diproses',   class: 'bg-amber-50 text-amber-700 border-amber-200' },
+  cancelled:  { label: 'Dibatalkan', class: 'bg-red-50 text-red-700 border-red-200' },
+}
+
+const PAYMENT_STATUS_CFG: Record<PaymentStatus, { label: string; class: string }> = {
+  paid:     { label: 'Lunas',         class: 'bg-green-50 text-green-700 border-green-200' },
+  waiting:  { label: 'Menunggu',      class: 'bg-amber-50 text-amber-700 border-amber-200' },
+  refunded: { label: 'Dikembalikan',  class: 'bg-zinc-100 text-zinc-700 border-zinc-200' },
+}
+
 // ─── Segment Badge ────────────────────────────────────────────────────────────
 
 function SegmentBadge({ segment }: { segment: Segment }) {
@@ -295,11 +371,14 @@ function CustomerDetailDialog({
   customer,
   open,
   onClose,
+  onOpenHistory,
 }: {
   customer: Customer | null
   open: boolean
   onClose: () => void
+  onOpenHistory: (c: Customer) => void
 }) {
+  const { hasFeature } = useTenant()
   if (!customer) return null
 
   return (
@@ -347,13 +426,13 @@ function CustomerDetailDialog({
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-muted p-3">
+            <div className="rounded-lg bg-muted p-3 min-w-0">
               <p className="text-xs text-muted-foreground">Total Pesanan</p>
-              <p className="text-xl font-bold mt-0.5">{customer.totalOrders}</p>
+              <p className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{customer.totalOrders}</p>
             </div>
-            <div className="rounded-lg bg-muted p-3">
+            <div className="rounded-lg bg-muted p-3 min-w-0">
               <p className="text-xs text-muted-foreground">Total Belanja</p>
-              <p className="text-xl font-bold mt-0.5 text-sm">{formatPrice(customer.totalSpend)}</p>
+              <p className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{formatPrice(customer.totalSpend)}</p>
             </div>
           </div>
 
@@ -361,19 +440,346 @@ function CustomerDetailDialog({
 
           {/* Recent Orders */}
           <div>
-            <p className="text-sm font-semibold mb-2">Riwayat Pesanan Terakhir</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold">Riwayat Pesanan Terakhir</p>
+              {hasFeature('customer-history-detail') && customer.orders.length > 3 && (
+                <span className="text-xs text-muted-foreground">menampilkan 3 dari {customer.orders.length}</span>
+              )}
+            </div>
             <div className="space-y-2">
               {customer.orders.slice(0, 3).map(order => (
-                <div key={order.id} className="flex items-center justify-between text-sm p-2.5 rounded-lg border bg-card">
+                <div key={order.id} className="flex items-center justify-between gap-3 text-sm p-2.5 rounded-lg border bg-card">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{order.product}</p>
-                    <p className="text-xs text-muted-foreground">{order.id} · {formatDate(order.date)}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">{order.id} · {formatDate(order.date)}</p>
                   </div>
-                  <p className="font-semibold shrink-0 ml-3">{formatPrice(order.amount)}</p>
+                  <p className="font-semibold shrink-0 text-right tabular-nums">{formatPrice(order.amount)}</p>
                 </div>
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          {hasFeature('customer-history-detail') && (
+            <Button onClick={() => onOpenHistory(customer)} className="flex items-center gap-1.5">
+              <History className="w-4 h-4" />
+              Riwayat Belanja Detail
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose}>Tutup</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Riwayat Belanja Detail (Business only) ───────────────────────────────────
+
+type PeriodFilter = '30d' | '90d' | '6m' | '1y' | 'all'
+type StatusFilter = 'all' | OrderStatus
+
+const PERIOD_OPTS: Array<{ value: PeriodFilter; label: string; days: number | null }> = [
+  { value: '30d', label: '30 hari terakhir', days: 30 },
+  { value: '90d', label: '90 hari terakhir', days: 90 },
+  { value: '6m',  label: '6 bulan terakhir', days: 180 },
+  { value: '1y',  label: '1 tahun terakhir', days: 365 },
+  { value: 'all', label: 'Semua periode',   days: null },
+]
+
+function CustomerHistoryDialog({
+  customer,
+  open,
+  onClose,
+  storeName,
+}: {
+  customer: Customer | null
+  open: boolean
+  onClose: () => void
+  storeName?: string
+}) {
+  const [period, setPeriod] = useState<PeriodFilter>('all')
+  const [status, setStatus] = useState<StatusFilter>('all')
+
+  const enriched = useMemo<Required<Order>[]>(
+    () => (customer?.orders ?? []).map(enrichOrder),
+    [customer]
+  )
+
+  const filtered = useMemo(() => {
+    const periodCfg = PERIOD_OPTS.find(p => p.value === period)
+    const cutoff = periodCfg?.days ? Date.now() - periodCfg.days * 86_400_000 : null
+    return enriched.filter(o => {
+      if (cutoff !== null && new Date(o.date).getTime() < cutoff) return false
+      if (status !== 'all' && o.status !== status) return false
+      return true
+    })
+  }, [enriched, period, status])
+
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => +new Date(b.date) - +new Date(a.date)),
+    [filtered]
+  )
+
+  // ── Analytics ──
+  const analytics = useMemo(() => {
+    const completed = filtered.filter(o => o.status !== 'cancelled')
+    const totalSpend = completed.reduce((s, o) => s + o.amount, 0)
+    const aov = completed.length > 0 ? totalSpend / completed.length : 0
+
+    const catTotals = new Map<string, number>()
+    completed.forEach(o => {
+      catTotals.set(o.category, (catTotals.get(o.category) ?? 0) + o.amount)
+    })
+    const favoriteCategory = [...catTotals.entries()].sort((a, b) => b[1] - a[1])[0]
+
+    // Lifetime value across ALL orders (ignores filter)
+    const lifetimeValue = enriched
+      .filter(o => o.status !== 'cancelled')
+      .reduce((s, o) => s + o.amount, 0)
+
+    // Repeat rate: orders per month since join
+    const firstDate = enriched.length > 0
+      ? new Date(enriched.reduce((min, o) => o.date < min ? o.date : min, enriched[0].date))
+      : new Date()
+    const monthsActive = Math.max(1, (Date.now() - firstDate.getTime()) / (30 * 86_400_000))
+    const orderFrequency = enriched.length / monthsActive
+
+    return {
+      totalOrders: filtered.length,
+      completedOrders: completed.length,
+      cancelledOrders: filtered.filter(o => o.status === 'cancelled').length,
+      totalSpend,
+      aov,
+      favoriteCategory: favoriteCategory ? favoriteCategory[0] : '—',
+      favoriteCategoryAmount: favoriteCategory ? favoriteCategory[1] : 0,
+      lifetimeValue,
+      orderFrequency,
+    }
+  }, [filtered, enriched])
+
+  const handleExportPdf = () => {
+    if (!customer) return
+    const periodLabel = PERIOD_OPTS.find(p => p.value === period)?.label ?? '—'
+    const statusLabel = status === 'all' ? 'Semua status' : ORDER_STATUS_CFG[status].label
+
+    exportPdf({
+      fileName: `riwayat-belanja-${customer.name.replace(/\s+/g, '-').toLowerCase()}-${fileStamp()}`,
+      title: `Riwayat Belanja — ${customer.name}`,
+      subtitle: `${customer.email} · Bergabung ${formatDate(customer.joinDate)} · ${customer.segment}`,
+      storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Pesanan', value: String(analytics.totalOrders) },
+        { label: 'Total Belanja', value: formatRupiah(analytics.totalSpend) },
+        { label: 'Rata-rata (AOV)', value: formatRupiah(Math.round(analytics.aov)) },
+        { label: 'Kategori Favorit', value: analytics.favoriteCategory },
+      ],
+      columns: [
+        { header: 'No. Pesanan', width: 30 },
+        { header: 'Tanggal', width: 26 },
+        { header: 'Produk', width: 60 },
+        { header: 'Kategori', width: 30 },
+        { header: 'Total', width: 30, align: 'right' },
+        { header: 'Status', width: 22, align: 'center' },
+        { header: 'Pembayaran', width: 24, align: 'center' },
+      ],
+      rows: sorted.map(o => [
+        o.id,
+        formatDate(o.date),
+        o.product,
+        o.category,
+        formatRupiah(o.amount),
+        ORDER_STATUS_CFG[o.status].label,
+        PAYMENT_STATUS_CFG[o.paymentStatus].label,
+      ]),
+      footnote: `Filter: ${periodLabel} · ${statusLabel}`,
+    })
+  }
+
+  if (!customer) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="w-5 h-5" />
+            Riwayat Belanja — {customer.name}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          {/* Identity strip */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{customer.email}</span>
+            <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{customer.phone}</span>
+            <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Bergabung {formatDate(customer.joinDate)}</span>
+            <SegmentBadge segment={customer.segment} />
+          </div>
+
+          {/* Filters + Export */}
+          <div className="flex flex-wrap items-center gap-2 pb-1 border-b">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Filter className="w-4 h-4" />
+              Filter:
+            </div>
+            <Select value={period} onValueChange={v => setPeriod(v as PeriodFilter)}>
+              <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTS.map(p => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua status</SelectItem>
+                {(Object.keys(ORDER_STATUS_CFG) as OrderStatus[]).map(s => (
+                  <SelectItem key={s} value={s}>{ORDER_STATUS_CFG[s].label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={handleExportPdf} className="h-8 text-xs">
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Export PDF
+            </Button>
+          </div>
+
+          {/* Analytics grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-xl p-3 bg-blue-50 border border-blue-100 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-blue-700 truncate">Total Pesanan</p>
+                <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              </div>
+              <p className="text-xl font-bold text-blue-900 mt-1 text-right tabular-nums truncate">{analytics.totalOrders}</p>
+              <p className="text-[10px] text-blue-600 mt-0.5 tabular-nums">
+                {analytics.completedOrders} selesai · {analytics.cancelledOrders} batal
+              </p>
+            </div>
+            <div className="rounded-xl p-3 bg-green-50 border border-green-100 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-green-700 truncate">Total Belanja</p>
+                <Wallet className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              </div>
+              <p className="text-lg font-bold text-green-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.totalSpend)}</p>
+              <p className="text-[10px] text-green-600 mt-0.5 tabular-nums truncate">
+                AOV: {formatPrice(Math.round(analytics.aov))}
+              </p>
+            </div>
+            <div className="rounded-xl p-3 bg-amber-50 border border-amber-100 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-amber-700 truncate">Kategori Favorit</p>
+                <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              </div>
+              <p className="text-base font-bold text-amber-900 mt-1 truncate">{analytics.favoriteCategory}</p>
+              <p className="text-[10px] text-amber-600 mt-0.5 tabular-nums truncate">
+                {formatPrice(analytics.favoriteCategoryAmount)}
+              </p>
+            </div>
+            <div className="rounded-xl p-3 bg-purple-50 border border-purple-100 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-purple-700 truncate">Lifetime Value</p>
+                <BarChart3 className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              </div>
+              <p className="text-lg font-bold text-purple-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.lifetimeValue)}</p>
+              <p className="text-[10px] text-purple-600 mt-0.5 tabular-nums">
+                {analytics.orderFrequency.toFixed(1)} pesanan / bulan
+              </p>
+            </div>
+          </div>
+
+          {/* Orders table */}
+          <div>
+            <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              Riwayat Pesanan ({sorted.length})
+            </p>
+            {sorted.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground border rounded-lg">
+                <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Tidak ada pesanan untuk filter ini</p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. Pesanan</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Produk</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center">Pembayaran</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sorted.map(o => (
+                      <TableRow key={o.id}>
+                        <TableCell className="font-mono text-xs">{o.id}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap tabular-nums">{formatDate(o.date)}</TableCell>
+                        <TableCell className="text-sm">{o.product}</TableCell>
+                        <TableCell className="text-sm">
+                          <Badge variant="outline" className="text-xs font-normal">{o.category}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">{formatPrice(o.amount)}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-[11px] font-medium ${ORDER_STATUS_CFG[o.status].class}`}>
+                            {ORDER_STATUS_CFG[o.status].label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full border text-[11px] font-medium ${PAYMENT_STATUS_CFG[o.paymentStatus].class}`}>
+                            {PAYMENT_STATUS_CFG[o.paymentStatus].label}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          {/* Category breakdown */}
+          {sorted.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold mb-2">Rincian per Kategori</p>
+              <div className="space-y-2">
+                {(() => {
+                  const byCat = new Map<string, { count: number; total: number }>()
+                  sorted.filter(o => o.status !== 'cancelled').forEach(o => {
+                    const cur = byCat.get(o.category) ?? { count: 0, total: 0 }
+                    cur.count += 1
+                    cur.total += o.amount
+                    byCat.set(o.category, cur)
+                  })
+                  const entries = [...byCat.entries()].sort((a, b) => b[1].total - a[1].total)
+                  const grand = entries.reduce((s, [, v]) => s + v.total, 0)
+                  return entries.map(([cat, v]) => {
+                    const pct = grand > 0 ? (v.total / grand) * 100 : 0
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center justify-between gap-3 text-sm mb-1">
+                          <span className="font-medium truncate">{cat}</span>
+                          <span className="text-muted-foreground tabular-nums shrink-0">
+                            {v.count} pesanan · {formatPrice(v.total)} · {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1.5">
+                          <div className="bg-primary h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end pt-2">
@@ -387,9 +793,11 @@ function CustomerDetailDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CustomersPage() {
+  const { hasFeature, tenant } = useTenant()
   const [searchTerm, setSearchTerm] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<'all' | Segment>('all')
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null)
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -433,45 +841,45 @@ export function CustomersPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pelanggan</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Pelanggan</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1.247</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">1.247</div>
             <p className="text-xs text-muted-foreground">pelanggan terdaftar</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pelanggan Baru Bulan Ini</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Pelanggan Baru Bulan Ini</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">+{newThisMonth}</div>
+            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">+{newThisMonth}</div>
             <p className="text-xs text-muted-foreground">bergabung bulan ini</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pelanggan Aktif</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-blue-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Pelanggan Aktif</CardTitle>
+            <ShoppingBag className="h-4 w-4 text-blue-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeCustomers}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{activeCustomers}</div>
             <p className="text-xs text-muted-foreground">aktif bertransaksi</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rata-rata CLV</CardTitle>
-            <Star className="h-4 w-4 text-amber-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Rata-rata CLV</CardTitle>
+            <Star className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(avgClv)}</div>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{formatPrice(avgClv)}</div>
             <p className="text-xs text-muted-foreground">customer lifetime value</p>
           </CardContent>
         </Card>
@@ -548,9 +956,9 @@ export function CustomersPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{customer.phone}</TableCell>
-                      <TableCell className="text-right font-medium">{customer.totalOrders}</TableCell>
-                      <TableCell className="text-right font-medium">{formatPrice(customer.totalSpend)}</TableCell>
+                      <TableCell className="text-sm tabular-nums">{customer.phone}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">{customer.totalOrders}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">{formatPrice(customer.totalSpend)}</TableCell>
                       <TableCell>
                         <SegmentBadge segment={customer.segment} />
                       </TableCell>
@@ -558,14 +966,26 @@ export function CustomersPage() {
                         {formatDate(customer.lastOrder)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Lihat detail"
-                          onClick={() => setViewCustomer(customer)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <div className="flex justify-end items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Lihat detail"
+                            onClick={() => setViewCustomer(customer)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {hasFeature('customer-history-detail') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Riwayat belanja detail"
+                              onClick={() => setHistoryCustomer(customer)}
+                            >
+                              <History className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -640,6 +1060,18 @@ export function CustomersPage() {
         customer={viewCustomer}
         open={!!viewCustomer}
         onClose={() => setViewCustomer(null)}
+        onOpenHistory={c => {
+          setViewCustomer(null)
+          setHistoryCustomer(c)
+        }}
+      />
+
+      {/* Riwayat Belanja Detail (Business only) */}
+      <CustomerHistoryDialog
+        customer={historyCustomer}
+        open={!!historyCustomer}
+        onClose={() => setHistoryCustomer(null)}
+        storeName={tenant?.storeName}
       />
     </div>
   )

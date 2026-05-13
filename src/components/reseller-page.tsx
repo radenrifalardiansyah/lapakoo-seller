@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -20,7 +21,7 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "./ui/pagination"
 import {
-  Handshake, Plus, Search, Eye, Edit, Trash2, FileSpreadsheet,
+  Handshake, Plus, Search, Eye, Edit, Trash2, FileSpreadsheet, FileText,
   UserCheck, UserX, CheckCircle, Clock, XCircle, Medal, TrendingUp,
   Copy, Phone, Mail, MapPin, Calendar, Coins, ChevronRight,
   Users, ShieldCheck, AlertCircle, ArrowRight, Star, Settings2,
@@ -463,17 +464,17 @@ function ViewResellerDialog({
             <div className="space-y-2.5">
               <p className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Performa Penjualan</p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="p-3 bg-blue-50 rounded-lg min-w-0">
                   <p className="text-xs text-blue-600">Total Omzet</p>
-                  <p className="font-bold text-blue-800 text-sm mt-0.5">{formatPrice(reseller.totalSales)}</p>
+                  <p className="font-bold text-blue-800 text-sm mt-0.5 text-right tabular-nums truncate">{formatPrice(reseller.totalSales)}</p>
                 </div>
-                <div className="p-3 bg-indigo-50 rounded-lg">
+                <div className="p-3 bg-indigo-50 rounded-lg min-w-0">
                   <p className="text-xs text-indigo-600">Total Pesanan</p>
-                  <p className="font-bold text-indigo-800 text-lg mt-0.5">{reseller.totalOrders}</p>
+                  <p className="font-bold text-indigo-800 text-lg mt-0.5 text-right tabular-nums truncate">{reseller.totalOrders}</p>
                 </div>
               </div>
               {reseller.totalOrders > 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground tabular-nums">
                   Rata-rata pesanan: {formatPrice(reseller.totalSales / reseller.totalOrders)}
                 </p>
               )}
@@ -486,21 +487,21 @@ function ViewResellerDialog({
           <div className="space-y-3">
             <p className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Komisi</p>
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-amber-600">Rate Komisi</p>
-                <p className="text-2xl font-bold text-amber-700">{biz.commission}%</p>
+                <p className="text-2xl font-bold text-amber-700 tabular-nums truncate">{biz.commission}%</p>
               </div>
-              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
+              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-orange-600">Menunggu Bayar</p>
-                <p className="font-bold text-orange-700 mt-0.5 text-sm">{formatPrice(reseller.pendingCommission)}</p>
+                <p className="font-bold text-orange-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</p>
               </div>
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-green-600">Sudah Dibayar</p>
-                <p className="font-bold text-green-700 mt-0.5 text-sm">{formatPrice(reseller.paidCommission)}</p>
+                <p className="font-bold text-green-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.paidCommission)}</p>
               </div>
             </div>
             {totalCommission > 0 && (
-              <p className="text-xs text-muted-foreground text-right">
+              <p className="text-xs text-muted-foreground text-right tabular-nums">
                 Total komisi sepanjang waktu: <strong>{formatPrice(totalCommission)}</strong>
               </p>
             )}
@@ -792,7 +793,7 @@ function PayCommissionDialog({
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
             <p className="text-sm text-amber-700">Komisi yang akan dibayarkan ke</p>
             <p className="font-bold text-lg mt-1">{reseller.name}</p>
-            <p className="text-2xl font-bold text-amber-700 mt-2">{formatPrice(reseller.pendingCommission)}</p>
+            <p className="text-2xl font-bold text-amber-700 mt-2 tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</p>
             <p className="text-xs text-amber-600 mt-1">
               Tier {reseller.tier} · {tierSettings[reseller.tier].commission}% komisi
             </p>
@@ -835,7 +836,7 @@ function PayCommissionDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ResellerPage() {
-  const { hasFeature } = useTenant()
+  const { hasFeature, tenant } = useTenant()
   const [resellers, setResellers]         = useState<Reseller[]>(initialResellers)
   const [tierSettings, setTierSettings]   = useState<Record<ResellerTier, TierBusinessConfig>>(DEFAULT_TIER_SETTINGS)
   const [searchTerm, setSearchTerm]       = useState('')
@@ -964,6 +965,48 @@ export function ResellerPage() {
     XLSX.writeFile(wb, `reseller-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  const handleExportPdf = () => {
+    const data = filterResellers(activeTab)
+    const totalSales = data.reduce((s, r) => s + r.totalSales, 0)
+    const totalPending = data.reduce((s, r) => s + r.pendingCommission, 0)
+
+    exportPdf({
+      fileName: `reseller-${activeTab}-${fileStamp()}`,
+      title: 'Daftar Reseller',
+      subtitle: `Filter: ${TABS.find(t => t.value === activeTab)?.label ?? 'Semua'}`,
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Reseller', value: String(data.length) },
+        { label: 'Total Penjualan', value: formatRupiah(totalSales) },
+        { label: 'Komisi Pending', value: formatRupiah(totalPending) },
+      ],
+      columns: [
+        { header: 'Nama', width: 40 },
+        { header: 'Email', width: 50 },
+        { header: 'Kota', width: 26 },
+        { header: 'Tier', width: 18, align: 'center' },
+        { header: 'Komisi %', width: 20, align: 'right' },
+        { header: 'Total Penjualan', width: 32, align: 'right' },
+        { header: 'Pending', width: 28, align: 'right' },
+        { header: 'Dibayar', width: 28, align: 'right' },
+        { header: 'Status', width: 22, align: 'center' },
+      ],
+      rows: data.map(r => [
+        r.name,
+        r.email,
+        r.city,
+        r.tier,
+        `${tierSettings[r.tier].commission}%`,
+        formatRupiah(r.totalSales),
+        formatRupiah(r.pendingCommission),
+        formatRupiah(r.paidCommission),
+        STATUS_CONFIG[r.status].label,
+      ]),
+      footnote: 'Daftar reseller diekspor dari Eleven Seller',
+    })
+  }
+
   // ── tabs config ──
   const TABS = [
     { value: 'all',       label: 'Semua',     count: stats.total },
@@ -991,6 +1034,11 @@ export function ResellerPage() {
               <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export Excel
             </Button>
           )}
+          {hasFeature('export-pdf') && (
+            <Button variant="outline" onClick={handleExportPdf}>
+              <FileText className="w-4 h-4 mr-1.5" />Export PDF
+            </Button>
+          )}
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="w-4 h-4 mr-1.5" />Tambah Reseller
           </Button>
@@ -1000,42 +1048,42 @@ export function ResellerPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Reseller</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Reseller</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">{stats.active} aktif</p>
+            <div className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</div>
+            <p className="text-xs text-muted-foreground tabular-nums">{stats.active} aktif</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Menunggu Persetujuan</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Menunggu Persetujuan</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
+            <div className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending}</div>
             <p className="text-xs text-muted-foreground">perlu ditinjau</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Komisi Pending</CardTitle>
-            <Coins className="h-4 w-4 text-orange-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Komisi Pending</CardTitle>
+            <Coins className="h-4 w-4 text-orange-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{formatPrice(stats.totalPending)}</div>
+            <div className="text-2xl font-bold text-orange-600 text-right tabular-nums truncate">{formatPrice(stats.totalPending)}</div>
             <p className="text-xs text-muted-foreground">belum dibayarkan</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Komisi Dibayar</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Komisi Dibayar</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatPrice(stats.totalPaid)}</div>
+            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.totalPaid)}</div>
             <p className="text-xs text-muted-foreground">sepanjang waktu</p>
           </CardContent>
         </Card>
@@ -1157,10 +1205,10 @@ export function ResellerPage() {
                                 </TableCell>
                                 <TableCell><TierBadge tier={r.tier} /></TableCell>
                                 <TableCell><StatusBadge status={r.status} /></TableCell>
-                                <TableCell className="text-right font-medium text-sm">
+                                <TableCell className="text-right font-medium text-sm tabular-nums whitespace-nowrap">
                                   {r.totalSales > 0 ? formatPrice(r.totalSales) : '—'}
                                 </TableCell>
-                                <TableCell className="text-right text-sm">
+                                <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
                                   {r.pendingCommission > 0
                                     ? <span className="text-orange-600 font-medium">{formatPrice(r.pendingCommission)}</span>
                                     : <span className="text-muted-foreground">—</span>

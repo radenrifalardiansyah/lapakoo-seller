@@ -4,6 +4,7 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "./ui/pagination"
 import * as XLSX from 'xlsx'
+import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -26,7 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Separator } from "./ui/separator"
 import {
   Plus, Search, Edit, Trash2, Eye, Package, AlertTriangle,
-  FileSpreadsheet, X, Check, Camera, Upload, Tags, FolderOpen,
+  FileSpreadsheet, FileText, X, Check, Camera, Upload, Tags, FolderOpen,
   Warehouse,
 } from 'lucide-react'
 import { ImageWithFallback } from './figma/ImageWithFallback'
@@ -503,10 +504,10 @@ function ImportDialog({
                           <TableCell className="text-xs font-medium">{String(row['Nama Produk'] || '-')}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{String(row['SKU'] || '-')}</TableCell>
                           <TableCell className="text-xs">{String(row['Kategori'] || '-')}</TableCell>
-                          <TableCell className="text-xs text-right">
+                          <TableCell className="text-xs text-right tabular-nums whitespace-nowrap">
                             {Number(row['Harga (Rp)'] || 0).toLocaleString('id-ID')}
                           </TableCell>
-                          <TableCell className="text-xs text-right">{String(row['Stok Awal'] || '0')}</TableCell>
+                          <TableCell className="text-xs text-right tabular-nums">{String(row['Stok Awal'] || '0')}</TableCell>
                         </TableRow>
                       )
                     })}
@@ -584,23 +585,23 @@ function ViewProductDialog({
           </div>
           <Separator />
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
+            <div className="min-w-0">
               <p className="text-muted-foreground">Kategori</p>
-              <p className="font-medium">{product.category}</p>
+              <p className="font-medium truncate">{product.category}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-muted-foreground">Harga</p>
-              <p className="font-medium">{formatPrice(product.price)}</p>
+              <p className="font-medium tabular-nums truncate">{formatPrice(product.price)}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-muted-foreground">Total Stok</p>
-              <p className={`font-medium ${total === 0 ? 'text-red-600' : total <= 5 ? 'text-orange-600' : ''}`}>
+              <p className={`font-medium tabular-nums truncate ${total === 0 ? 'text-red-600' : total <= 5 ? 'text-orange-600' : ''}`}>
                 {total} unit
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-muted-foreground">Berat</p>
-              <p className="font-medium">{product.weight ?? '-'} gram</p>
+              <p className="font-medium tabular-nums truncate">{product.weight ?? '-'} gram</p>
             </div>
           </div>
 
@@ -918,7 +919,7 @@ export function ProductManagement({
     products, warehouses, totalStockOf, primaryWarehouseId,
     addProduct, updateProduct, deleteProduct, bulkAddProducts,
   } = useInventory()
-  const { hasFeature } = useTenant()
+  const { hasFeature, tenant } = useTenant()
 
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES)
   const [searchTerm, setSearchTerm] = useState('')
@@ -994,6 +995,43 @@ export function ProductManagement({
     XLSX.writeFile(wb, `produk-toko-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  // ── Export PDF ──
+  const handleExportPdf = () => {
+    const totalNilai = filtered.reduce((s, p) => s + p.price * totalStockOf(p.id), 0)
+    exportPdf({
+      fileName: `produk-toko-${fileStamp()}`,
+      title: 'Daftar Produk',
+      subtitle: 'Katalog produk toko & status stok',
+      storeName: tenant?.storeName,
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Produk', value: String(filtered.length) },
+        { label: 'Nilai Inventory', value: formatRupiah(totalNilai) },
+      ],
+      columns: [
+        { header: 'Nama Produk', width: 70 },
+        { header: 'SKU', width: 28 },
+        { header: 'Kategori', width: 30 },
+        { header: 'Harga', width: 30, align: 'right' },
+        { header: 'Stok', width: 18, align: 'right' },
+        { header: 'Berat', width: 20, align: 'right' },
+        { header: 'Status', width: 26, align: 'center' },
+      ],
+      rows: filtered.map(p => {
+        const stock = totalStockOf(p.id)
+        return [
+          p.name,
+          p.sku,
+          p.category,
+          formatRupiah(p.price),
+          stock.toLocaleString('id-ID'),
+          p.weight ? `${p.weight} g` : '—',
+          stock === 0 ? 'Habis' : stock <= 5 ? 'Stok Rendah' : 'Aktif',
+        ]
+      }),
+    })
+  }
+
   const activeCount = products.filter(p => totalStockOf(p.id) > 5).length
   const lowCount = products.filter(p => {
     const s = totalStockOf(p.id)
@@ -1016,6 +1054,12 @@ export function ProductManagement({
             <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4" />
               Export Excel
+            </Button>
+          )}
+          {hasFeature('export-pdf') && (
+            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Export PDF
             </Button>
           )}
           {hasFeature('bulk-import') && (
@@ -1110,8 +1154,8 @@ export function ProductManagement({
                   <TableRow>
                     <TableHead>Produk</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead>Harga</TableHead>
-                    <TableHead>Stok (Total)</TableHead>
+                    <TableHead className="text-right">Harga</TableHead>
+                    <TableHead className="text-right">Stok (Total)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -1135,8 +1179,8 @@ export function ProductManagement({
                           </div>
                         </TableCell>
                         <TableCell>{product.category}</TableCell>
-                        <TableCell>{formatPrice(product.price)}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">{formatPrice(product.price)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
                           <span className={
                             stock === 0 ? 'text-red-600 font-medium' :
                             stock <= 5 ? 'text-orange-600 font-medium' : ''
