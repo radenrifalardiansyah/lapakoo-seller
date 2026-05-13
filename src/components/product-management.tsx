@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { ImageWithFallback } from './figma/ImageWithFallback'
 import { useInventory } from '../contexts/InventoryContext'
+import { useTenant } from '../contexts/TenantContext'
 import type { Product } from '../types/inventory'
 
 const DEFAULT_CATEGORIES = ['Electronics', 'Fashion', 'Home & Garden', 'Sports', 'Books', 'Other']
@@ -917,6 +918,7 @@ export function ProductManagement({
     products, warehouses, totalStockOf, primaryWarehouseId,
     addProduct, updateProduct, deleteProduct, bulkAddProducts,
   } = useInventory()
+  const { hasFeature } = useTenant()
 
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES)
   const [searchTerm, setSearchTerm] = useState('')
@@ -1010,14 +1012,18 @@ export function ProductManagement({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            Export Excel
-          </Button>
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="flex items-center gap-2">
-            <Upload className="w-4 h-4" />
-            Import Massal
-          </Button>
+          {hasFeature('export-data') && (
+            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Export Excel
+            </Button>
+          )}
+          {hasFeature('bulk-import') && (
+            <Button variant="outline" onClick={() => setIsImportOpen(true)} className="flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Import Massal
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setIsCategoryOpen(true)} className="flex items-center gap-2">
             <Tags className="w-4 h-4" />
             Kategori

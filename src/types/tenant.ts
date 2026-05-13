@@ -11,7 +11,14 @@ export type FeatureKey =
   | 'notifications'
   | 'settings'
   | 'help'
-  | 'team';
+  | 'team'
+  | 'export-data'
+  | 'bulk-import'
+  | 'stock-transfer'
+  | 'bulk-actions'
+  | 'advanced-notifications'
+  | 'low-stock-alerts'
+  | 'two-factor-auth';
 
 export interface Package {
   id: string;

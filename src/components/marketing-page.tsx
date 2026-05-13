@@ -26,6 +26,7 @@ import {
   Calendar, Ban,
 } from 'lucide-react'
 import { useInventory } from '../contexts/InventoryContext'
+import { useTenant } from '../contexts/TenantContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -692,6 +693,7 @@ function FlashSaleCard({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function MarketingPage() {
+  const { hasFeature } = useTenant()
   const [vouchers, setVouchers]       = useState<Voucher[]>(initialVouchers)
   const [flashSales, setFlashSales]   = useState<FlashSale[]>(initialFlashSales)
   const [activeTab, setActiveTab]     = useState('vouchers')
@@ -927,9 +929,11 @@ export function MarketingPage() {
                       <SelectItem value="disabled">Dinonaktifkan</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={handleExportVouchers}>
-                    <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
-                  </Button>
+                  {hasFeature('export-data') && (
+                    <Button variant="outline" onClick={handleExportVouchers}>
+                      <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
+                    </Button>
+                  )}
                   <Button onClick={() => setAddVoucherOpen(true)}>
                     <Plus className="w-4 h-4 mr-1.5" />Buat Voucher
                   </Button>

@@ -14,6 +14,7 @@ import {
   AlertTriangle, Info, Tag, Star, Target, Users,
   Clock, ArrowRight,
 } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -146,7 +147,10 @@ function PriceTooltip({ active, payload, label }: any) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function DashboardOverview({ onAddProduct }: { onAddProduct?: () => void } = {}) {
+export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProduct?: () => void; onViewAllOrders?: () => void } = {}) {
+  const { tenant } = useTenant()
+  const isStarter = tenant?.package.id === 'starter'
+
   // Announcements
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
   const visibleAnnouncements = announcements.filter(a => !a.dismissed)
@@ -179,10 +183,12 @@ export function DashboardOverview({ onAddProduct }: { onAddProduct?: () => void 
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Selamat datang kembali! Berikut ringkasan toko Anda hari ini.</p>
         </div>
-        <Button onClick={onAddProduct} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Tambah Produk
-        </Button>
+        {!isStarter && (
+          <Button onClick={onAddProduct} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Tambah Produk
+          </Button>
+        )}
       </div>
 
       {/* ── Ringkasan Bisnis ── */}
@@ -296,7 +302,7 @@ export function DashboardOverview({ onAddProduct }: { onAddProduct?: () => void 
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Pesanan Terbaru</CardTitle>
-            <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground">
+            <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground" onClick={onViewAllOrders}>
               Lihat semua <ArrowRight className="w-3 h-3" />
             </Button>
           </div>

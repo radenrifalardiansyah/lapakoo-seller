@@ -17,12 +17,19 @@ import { MarketingPage, initialVouchers } from "./components/marketing-page";
 import { HelpPage } from "./components/help-page";
 import { TeamPage } from "./components/team-page";
 import { LiveChat } from "./components/live-chat";
+import { UserProfileDialog } from "./components/user-profile-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
-import { Bell, LogOut, Menu, Store, AlertTriangle } from "lucide-react";
+import { Bell, LogOut, Menu, Store, AlertTriangle, ChevronDown } from "lucide-react";
 
 function NotificationsPage() {
+  const { hasFeature } = useTenant();
+  const notifications = [
+    { color: "bg-blue-500", text: "Pesanan baru dari Ahmad Rizki", time: "5 menit yang lalu", badge: "Baru", variant: "default" as const, feature: null },
+    { color: "bg-orange-500", text: "Stok iPhone 14 Pro hampir habis", time: "2 jam yang lalu", badge: "Stok", variant: "outline" as const, feature: 'low-stock-alerts' as const },
+    { color: "bg-green-500", text: "Pembayaran Rp 15.999.000 berhasil", time: "1 hari yang lalu", badge: "Pembayaran", variant: "secondary" as const, feature: null },
+  ].filter(n => !n.feature || hasFeature(n.feature));
   return (
     <div className="space-y-6">
       <div>
@@ -38,11 +45,7 @@ function NotificationsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[
-              { color: "bg-blue-500", text: "Pesanan baru dari Ahmad Rizki", time: "5 menit yang lalu", badge: "Baru", variant: "default" as const },
-              { color: "bg-orange-500", text: "Stok iPhone 14 Pro hampir habis", time: "2 jam yang lalu", badge: "Stok", variant: "outline" as const },
-              { color: "bg-green-500", text: "Pembayaran Rp 15.999.000 berhasil", time: "1 hari yang lalu", badge: "Pembayaran", variant: "secondary" as const },
-            ].map((n, i) => (
+            {notifications.map((n, i) => (
               <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
                 <div className={`w-2 h-2 ${n.color} rounded-full shrink-0`} />
                 <div className="flex-1">
@@ -103,6 +106,11 @@ function AppInner() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const goToOrders = () => {
+    setActiveTab("orders");
+  };
 
   const goToAddProduct = () => {
     setActiveTab("products");
@@ -149,7 +157,7 @@ function AppInner() {
       );
     }
     switch (activeTab) {
-      case "dashboard":     return <DashboardOverview onAddProduct={goToAddProduct} />;
+      case "dashboard":     return <DashboardOverview onAddProduct={goToAddProduct} onViewAllOrders={goToOrders} />;
       case "products":      return <ProductManagement initialAction={productAction} onActionConsumed={() => setProductAction(null)} />;
       case "warehouse":     return <WarehouseManagement />;
       case "orders":        return <OrderManagement />;
@@ -160,13 +168,15 @@ function AppInner() {
       case "payments":      return <PaymentsPage />;
       case "notifications": return <NotificationsPage />;
       case "settings":      return <SettingsPage />;
-      case "help":          return <HelpPage />;
+      case "help":          return <HelpPage onNavigate={setActiveTab} />;
       case "team":          return <TeamPage />;
       default:              return <DashboardOverview />;
     }
   };
 
-  const productBadge   = products.filter(p => totalStockOf(p.id) <= 5).length;
+  const productBadge   = hasFeature('low-stock-alerts')
+    ? products.filter(p => totalStockOf(p.id) <= 5).length
+    : 0;
   const orderBadge     = initialOrders.filter(o => o.status === 'pending').length;
   const resellerBadge  = initialResellers.filter(r => r.status === 'pending').length;
   const marketingBadge = initialVouchers.filter(v => {
@@ -211,15 +221,21 @@ function AppInner() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-2 border border-gray-200 rounded-full px-3 py-1.5">
+            <button
+              type="button"
+              onClick={() => setShowProfile(true)}
+              aria-label="Lihat profil pengguna"
+              className="flex items-center gap-2 border border-gray-200 rounded-full pl-1 pr-2 sm:pr-3 py-1 sm:py-1.5 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
+            >
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                className="w-6 h-6 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-xs sm:text-[10px] font-bold shrink-0"
                 style={{ backgroundColor: primaryColor }}
               >
                 {userEmail.charAt(0).toUpperCase()}
               </div>
-              <p className="text-xs font-medium text-gray-700">{userEmail.split('@')[0]}</p>
-            </div>
+              <p className="hidden sm:block text-xs font-medium text-gray-700">{userEmail.split('@')[0]}</p>
+              <ChevronDown className="hidden sm:block w-3 h-3 text-gray-400" />
+            </button>
             <Button
               variant="ghost"
               size="sm"
@@ -236,6 +252,14 @@ function AppInner() {
         </main>
       </div>
       <LiveChat />
+      <UserProfileDialog
+        open={showProfile}
+        onClose={() => setShowProfile(false)}
+        userEmail={userEmail}
+        tenant={tenant}
+        onGoToSettings={() => setActiveTab('settings')}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

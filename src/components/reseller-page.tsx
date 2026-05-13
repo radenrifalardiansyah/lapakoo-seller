@@ -26,6 +26,7 @@ import {
   Users, ShieldCheck, AlertCircle, ArrowRight, Star, Settings2,
   RotateCcw,
 } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -834,6 +835,7 @@ function PayCommissionDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ResellerPage() {
+  const { hasFeature } = useTenant()
   const [resellers, setResellers]         = useState<Reseller[]>(initialResellers)
   const [tierSettings, setTierSettings]   = useState<Record<ResellerTier, TierBusinessConfig>>(DEFAULT_TIER_SETTINGS)
   const [searchTerm, setSearchTerm]       = useState('')
@@ -984,9 +986,11 @@ export function ResellerPage() {
           <Button variant="outline" onClick={() => setIsTierSettingsOpen(true)}>
             <Settings2 className="w-4 h-4 mr-1.5" />Pengaturan Tier
           </Button>
-          <Button variant="outline" onClick={handleExport}>
-            <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export Excel
-          </Button>
+          {hasFeature('export-data') && (
+            <Button variant="outline" onClick={handleExport}>
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export Excel
+            </Button>
+          )}
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="w-4 h-4 mr-1.5" />Tambah Reseller
           </Button>

@@ -489,7 +489,7 @@ function TransferDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function WarehouseManagement() {
-  const { tenant } = useTenant()
+  const { tenant, hasFeature } = useTenant()
   const {
     products, warehouses, movements, distribution,
     addWarehouse, updateWarehouse, deleteWarehouse,
@@ -672,15 +672,19 @@ export function WarehouseManagement() {
           <p className="text-muted-foreground">Kelola lokasi penyimpanan, stok per gudang, transfer, dan riwayat pergerakan barang.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4" />Export Excel
-          </Button>
+          {hasFeature('export-data') && (
+            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" />Export Excel
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setIsAdjustOpen(true)} disabled={activeCount === 0}>
             <SlidersHorizontal className="w-4 h-4 mr-1.5" />Penyesuaian Stok
           </Button>
-          <Button variant="outline" onClick={() => setIsTransferOpen(true)} disabled={activeCount < 2}>
-            <ArrowRightLeft className="w-4 h-4 mr-1.5" />Transfer Stok
-          </Button>
+          {hasFeature('stock-transfer') && (
+            <Button variant="outline" onClick={() => setIsTransferOpen(true)} disabled={activeCount < 2}>
+              <ArrowRightLeft className="w-4 h-4 mr-1.5" />Transfer Stok
+            </Button>
+          )}
           <Button onClick={() => setIsAddOpen(true)} disabled={atLimit}>
             <Plus className="w-4 h-4 mr-1.5" />Tambah Gudang
           </Button>
@@ -1023,8 +1027,12 @@ export function WarehouseManagement() {
                       <SelectItem value="all">Semua tipe</SelectItem>
                       <SelectItem value="adjustment_in">{MOVEMENT_LABEL.adjustment_in.label}</SelectItem>
                       <SelectItem value="adjustment_out">{MOVEMENT_LABEL.adjustment_out.label}</SelectItem>
-                      <SelectItem value="transfer_in">{MOVEMENT_LABEL.transfer_in.label}</SelectItem>
-                      <SelectItem value="transfer_out">{MOVEMENT_LABEL.transfer_out.label}</SelectItem>
+                      {hasFeature('stock-transfer') && (
+                        <>
+                          <SelectItem value="transfer_in">{MOVEMENT_LABEL.transfer_in.label}</SelectItem>
+                          <SelectItem value="transfer_out">{MOVEMENT_LABEL.transfer_out.label}</SelectItem>
+                        </>
+                      )}
                       <SelectItem value="sale">{MOVEMENT_LABEL.sale.label}</SelectItem>
                       <SelectItem value="restock">{MOVEMENT_LABEL.restock.label}</SelectItem>
                     </SelectContent>

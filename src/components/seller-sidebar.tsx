@@ -202,12 +202,14 @@ export function SellerSidebar({
             <span className="text-xs text-gray-500">Pesanan Baru</span>
             <span className="text-xs font-bold" style={{ color: theme.accent }}>5</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-amber-600 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />Stok Rendah
-            </span>
-            <span className="text-xs font-bold text-amber-600">12</span>
-          </div>
+          {hasFeature('low-stock-alerts') && (
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />Stok Rendah
+              </span>
+              <span className="text-xs font-bold text-amber-600">12</span>
+            </div>
+          )}
         </div>
 
         {/* Bottom Nav */}

@@ -22,6 +22,7 @@ import {
   MessageCircle, Printer, Ban, RotateCcw, CheckSquare, Square,
   ThumbsUp, ThumbsDown, Send
 } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -978,6 +979,7 @@ function OrdersTable({
   onRetur,
   selectedIds,
   onToggleSelect,
+  bulkEnabled,
 }: {
   orders: Order[]
   onView: (o: Order) => void
@@ -986,6 +988,7 @@ function OrdersTable({
   onRetur: (o: Order) => void
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
+  bulkEnabled: boolean
 }) {
   if (orders.length === 0)
     return (
@@ -999,7 +1002,7 @@ function OrdersTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8"></TableHead>
+          {bulkEnabled && <TableHead className="w-8"></TableHead>}
           <TableHead>Pesanan</TableHead>
           <TableHead>Pelanggan</TableHead>
           <TableHead>Total</TableHead>
@@ -1022,20 +1025,22 @@ function OrdersTable({
 
           return (
             <TableRow key={order.id} className={isSelected ? 'bg-primary/5' : ''}>
-              <TableCell>
-                {isSelectable ? (
-                  <button
-                    type="button"
-                    onClick={() => onToggleSelect(order.id)}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {isSelected
-                      ? <CheckSquare className="w-4 h-4 text-primary" />
-                      : <Square className="w-4 h-4" />
-                    }
-                  </button>
-                ) : null}
-              </TableCell>
+              {bulkEnabled && (
+                <TableCell>
+                  {isSelectable ? (
+                    <button
+                      type="button"
+                      onClick={() => onToggleSelect(order.id)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {isSelected
+                        ? <CheckSquare className="w-4 h-4 text-primary" />
+                        : <Square className="w-4 h-4" />
+                      }
+                    </button>
+                  ) : null}
+                </TableCell>
+              )}
               <TableCell>
                 <p className="font-mono font-medium text-sm">{order.id}</p>
                 <p className="text-xs text-muted-foreground">{order.items.length} item</p>
@@ -1104,6 +1109,7 @@ function OrdersTable({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function OrderManagement() {
+  const { hasFeature } = useTenant()
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all')
@@ -1270,10 +1276,12 @@ export function OrderManagement() {
           <h1 className="text-2xl font-bold">Manajemen Pesanan</h1>
           <p className="text-muted-foreground">Kelola dan pantau semua pesanan yang masuk dari pelanggan</p>
         </div>
-        <Button variant="outline" onClick={handleExport} className="flex items-center gap-2 shrink-0">
-          <FileSpreadsheet className="w-4 h-4" />
-          Export Excel
-        </Button>
+        {hasFeature('export-data') && (
+          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2 shrink-0">
+            <FileSpreadsheet className="w-4 h-4" />
+            Export Excel
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -1358,7 +1366,7 @@ export function OrderManagement() {
           </CardHeader>
           <CardContent>
             {/* Bulk action bar */}
-            {selectedIds.size > 0 && (
+            {hasFeature('bulk-actions') && selectedIds.size > 0 && (
               <div className="flex items-center justify-between gap-3 mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <CheckSquare className="w-4 h-4 text-primary" />
@@ -1422,6 +1430,7 @@ export function OrderManagement() {
                         onRetur={o => setReturOrder(o)}
                         selectedIds={selectedIds}
                         onToggleSelect={handleToggleSelect}
+                        bulkEnabled={hasFeature('bulk-actions')}
                       />
 
                       {/* Pagination bar */}

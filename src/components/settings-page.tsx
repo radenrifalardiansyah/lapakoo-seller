@@ -17,6 +17,7 @@ import {
   LogOut as LogOutIcon, AlertTriangle, Package, Star, MessageSquare,
   CheckCircle2,
 } from "lucide-react";
+import { useTenant } from "../contexts/TenantContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,8 @@ const MOCK_SESSIONS = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function SettingsPage() {
+  const { hasFeature } = useTenant();
+
   // ── Profil toko ──
   const [storeInfo, setStoreInfo]   = useState<StoreInfo>(defaultStoreInfo);
   const [formData, setFormData]     = useState<StoreInfo>(defaultStoreInfo);
@@ -623,8 +626,10 @@ export function SettingsPage() {
             { key: "emailNewOrder"    as const, label: "Email Pesanan Baru",     desc: "Terima notifikasi email saat ada pesanan masuk" },
             { key: "smsPayment"       as const, label: "SMS Alert Pembayaran",   desc: "Terima SMS saat pembayaran berhasil" },
             { key: "pushNotification" as const, label: "Push Notifikasi",        desc: "Notifikasi langsung di browser atau aplikasi" },
-            { key: "emailLowStock"    as const, label: "Email Stok Rendah",      desc: "Peringatan email saat stok produk hampir habis" },
-            { key: "emailPromotion"   as const, label: "Info Promosi & Program", desc: "Update promosi dan program seller terbaru" },
+            ...(hasFeature("advanced-notifications") ? [
+              { key: "emailLowStock"    as const, label: "Email Stok Rendah",      desc: "Peringatan email saat stok produk hampir habis" },
+              { key: "emailPromotion"   as const, label: "Info Promosi & Program", desc: "Update promosi dan program seller terbaru" },
+            ] : []),
           ].map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between py-3 border-b last:border-0">
               <div>
@@ -747,36 +752,40 @@ export function SettingsPage() {
             )}
           </div>
 
-          <Separator />
+          {hasFeature("two-factor-auth") && (
+            <>
+              <Separator />
 
-          {/* 2FA */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold flex items-center gap-1.5">
-                  <Smartphone className="w-4 h-4" />Verifikasi 2 Langkah (2FA)
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Tambahkan lapisan keamanan ekstra saat login
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={twoFactor ? "default" : "secondary"}>
-                  {twoFactor ? "Aktif" : "Nonaktif"}
-                </Badge>
-                <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
-              </div>
-            </div>
-            {twoFactor && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-sm text-blue-800">
-                <Smartphone className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium">2FA Aktif</p>
-                  <p className="text-xs mt-0.5">Kode OTP akan dikirim ke nomor telepon terdaftar setiap kali login.</p>
+              {/* 2FA */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4" />Verifikasi 2 Langkah (2FA)
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Tambahkan lapisan keamanan ekstra saat login
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={twoFactor ? "default" : "secondary"}>
+                      {twoFactor ? "Aktif" : "Nonaktif"}
+                    </Badge>
+                    <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
+                  </div>
                 </div>
+                {twoFactor && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-sm text-blue-800">
+                    <Smartphone className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">2FA Aktif</p>
+                      <p className="text-xs mt-0.5">Kode OTP akan dikirim ke nomor telepon terdaftar setiap kali login.</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Notifikasi login */}
           <div className="flex items-center justify-between">

@@ -2,13 +2,14 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { Badge } from "./ui/badge"
-import { Separator } from "./ui/separator"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "./ui/dialog"
 import {
   HelpCircle, Search, ChevronDown, ChevronUp, Mail, Phone,
   MessageSquare, CheckCircle2, Package, ShoppingCart, CreditCard,
-  Handshake, Megaphone, Settings, BarChart3, Zap, BookOpen,
-  AlertCircle, ExternalLink, Clock, Shield, Truck,
+  Handshake, Megaphone, BarChart3, Zap, BookOpen,
+  AlertCircle, Clock, Shield, Truck, ArrowRight,
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -179,13 +180,120 @@ const FAQ_CATEGORIES: FaqCategory[] = [
   },
 ]
 
-const QUICK_GUIDES = [
-  { icon: Package,     label: "Tambah Produk Pertama",   desc: "Panduan lengkap menambah dan mengatur produk", color: "bg-blue-50 border-blue-200 text-blue-700" },
-  { icon: ShoppingCart,label: "Proses Pesanan Masuk",    desc: "Cara menerima, memproses, dan mengirim pesanan", color: "bg-orange-50 border-orange-200 text-orange-700" },
-  { icon: Truck,       label: "Setup Layanan Pengiriman",desc: "Aktifkan kurir dan atur ongkir gratis", color: "bg-teal-50 border-teal-200 text-teal-700" },
-  { icon: Zap,         label: "Buat Flash Sale",         desc: "Tingkatkan penjualan dengan promo waktu terbatas", color: "bg-red-50 border-red-200 text-red-700" },
-  { icon: Handshake,   label: "Daftarkan Reseller",      desc: "Bangun jaringan reseller dan atur komisi", color: "bg-purple-50 border-purple-200 text-purple-700" },
-  { icon: BarChart3,   label: "Baca Laporan Analitik",   desc: "Pahami performa toko dari data penjualan", color: "bg-green-50 border-green-200 text-green-700" },
+interface QuickGuide {
+  id: string
+  icon: React.ElementType
+  label: string
+  desc: string
+  color: string
+  targetTab: string
+  ctaLabel: string
+  steps: string[]
+}
+
+const QUICK_GUIDES: QuickGuide[] = [
+  {
+    id: "add-product",
+    icon: Package,
+    label: "Tambah Produk Pertama",
+    desc: "Panduan lengkap menambah dan mengatur produk",
+    color: "bg-blue-50 border-blue-200 text-blue-700",
+    targetTab: "products",
+    ctaLabel: "Buka Halaman Produk",
+    steps: [
+      "Buka menu Produk dari sidebar kiri.",
+      "Klik tombol 'Tambah Produk' di pojok kanan atas halaman.",
+      "Isi nama produk, kategori, deskripsi singkat, dan SKU unik.",
+      "Masukkan harga jual, harga modal (opsional), dan jumlah stok awal.",
+      "Upload minimal 1 foto produk (rekomendasi rasio 1:1, ukuran < 2MB).",
+      "Klik 'Simpan' — produk langsung tampil di etalase toko.",
+    ],
+  },
+  {
+    id: "process-order",
+    icon: ShoppingCart,
+    label: "Proses Pesanan Masuk",
+    desc: "Cara menerima, memproses, dan mengirim pesanan",
+    color: "bg-orange-50 border-orange-200 text-orange-700",
+    targetTab: "orders",
+    ctaLabel: "Buka Halaman Pesanan",
+    steps: [
+      "Buka menu Pesanan — badge angka di sidebar menandakan pesanan baru.",
+      "Pesanan dengan status 'Menunggu' perlu segera diproses.",
+      "Klik 'Proses' agar status berubah menjadi 'Diproses' dan pelanggan menerima notifikasi.",
+      "Siapkan barang, lalu klik 'Kirim' dan pilih kurir + isi nomor resi.",
+      "Untuk efisiensi, gunakan tombol 'Kirim Massal' untuk multiple pesanan sekaligus.",
+      "Status otomatis berubah ke 'Terkirim' setelah pelanggan konfirmasi penerimaan.",
+    ],
+  },
+  {
+    id: "setup-shipping",
+    icon: Truck,
+    label: "Setup Layanan Pengiriman",
+    desc: "Aktifkan kurir dan atur ongkir gratis",
+    color: "bg-teal-50 border-teal-200 text-teal-700",
+    targetTab: "settings",
+    ctaLabel: "Buka Pengaturan",
+    steps: [
+      "Buka Pengaturan → tab 'Pengiriman'.",
+      "Aktifkan kurir yang ingin didukung (JNE, J&T, SiCepat, AnterAja, dll.).",
+      "Atur titik asal pengiriman sesuai alamat gudang utama Anda.",
+      "Opsional: aktifkan 'Gratis Ongkir' dengan minimum belanja tertentu.",
+      "Atur estimasi waktu packing (mis. 1 hari) agar ekspektasi pelanggan jelas.",
+      "Simpan pengaturan — opsi kurir akan langsung muncul saat checkout.",
+    ],
+  },
+  {
+    id: "flash-sale",
+    icon: Zap,
+    label: "Buat Flash Sale",
+    desc: "Tingkatkan penjualan dengan promo waktu terbatas",
+    color: "bg-red-50 border-red-200 text-red-700",
+    targetTab: "marketing",
+    ctaLabel: "Buka Pemasaran",
+    steps: [
+      "Buka menu Pemasaran → tab 'Flash Sale'.",
+      "Klik 'Buat Flash Sale' di pojok kanan atas.",
+      "Isi nama campaign, tanggal & jam mulai, serta tanggal & jam berakhir.",
+      "Tambahkan produk yang akan diikutkan — atur harga flash sale dan kuota per produk.",
+      "Pastikan harga flash sale lebih rendah dari harga normal untuk efek psikologis.",
+      "Simpan — countdown otomatis tampil di etalase saat campaign aktif.",
+    ],
+  },
+  {
+    id: "reseller",
+    icon: Handshake,
+    label: "Daftarkan Reseller",
+    desc: "Bangun jaringan reseller dan atur komisi",
+    color: "bg-purple-50 border-purple-200 text-purple-700",
+    targetTab: "resellers",
+    ctaLabel: "Buka Halaman Reseller",
+    steps: [
+      "Buka menu Reseller dari sidebar.",
+      "Cek tab 'Menunggu' untuk pendaftaran reseller baru yang belum disetujui.",
+      "Klik ikon centang (✓) untuk menyetujui, atau tolak jika data kurang lengkap.",
+      "Tetapkan tier awal: Bronze (5%), Silver (8%), Gold (12%), atau Platinum (15%).",
+      "Kode referral otomatis dibuat — bagikan ke reseller untuk tracking penjualan.",
+      "Bayar komisi via tombol 'Bayar Komisi' saat reseller mengajukan pencairan.",
+    ],
+  },
+  {
+    id: "analytics",
+    icon: BarChart3,
+    label: "Baca Laporan Analitik",
+    desc: "Pahami performa toko dari data penjualan",
+    color: "bg-green-50 border-green-200 text-green-700",
+    targetTab: "analytics",
+    ctaLabel: "Buka Analitik",
+    steps: [
+      "Buka menu Analitik untuk melihat ringkasan performa toko.",
+      "Perhatikan 4 metrik utama: total penjualan, jumlah pesanan, pelanggan baru, dan AOV.",
+      "Gunakan filter periode (7 hari / 30 hari / kustom) untuk membandingkan tren.",
+      "Cek grafik 'Produk Terlaris' untuk mengetahui SKU andalan.",
+      "Lihat 'Sumber Trafik' untuk tahu kanal mana yang paling efektif.",
+      "Export laporan ke Excel untuk analisis lanjutan di luar platform.",
+    ],
+  },
 ]
 
 const SYSTEM_STATUS = [
@@ -197,12 +305,22 @@ const SYSTEM_STATUS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function HelpPage() {
+interface HelpPageProps {
+  onNavigate?: (tab: string) => void
+}
+
+export function HelpPage({ onNavigate }: HelpPageProps = {}) {
   const [search, setSearch]           = useState("")
   const [openFaq, setOpenFaq]         = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string>("products")
+  const [activeGuide, setActiveGuide] = useState<QuickGuide | null>(null)
 
   const toggleFaq = (key: string) => setOpenFaq(prev => prev === key ? null : key)
+
+  const handleGuideAction = (guide: QuickGuide) => {
+    setActiveGuide(null)
+    onNavigate?.(guide.targetTab)
+  }
 
   const filtered = FAQ_CATEGORIES.map(cat => ({
     ...cat,
@@ -251,15 +369,19 @@ export function HelpPage() {
             <BookOpen className="w-4 h-4" />Panduan Cepat
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {QUICK_GUIDES.map((g, i) => {
+            {QUICK_GUIDES.map(g => {
               const Icon = g.icon
               return (
-                <div key={i}
-                  className={`p-4 rounded-xl border cursor-pointer hover:shadow-sm transition-shadow ${g.color}`}>
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setActiveGuide(g)}
+                  className={`text-left p-4 rounded-xl border cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all ${g.color}`}
+                >
                   <Icon className="w-5 h-5 mb-2" />
                   <p className="text-sm font-semibold leading-tight">{g.label}</p>
                   <p className="text-xs mt-1 opacity-80">{g.desc}</p>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -426,6 +548,51 @@ export function HelpPage() {
           </p>
         </div>
       </div>
+
+      {/* Quick Guide Dialog */}
+      <Dialog open={activeGuide !== null} onOpenChange={(open) => !open && setActiveGuide(null)}>
+        <DialogContent className="sm:max-w-lg">
+          {activeGuide && (
+            <>
+              <DialogHeader>
+                <div className={`w-11 h-11 rounded-xl border flex items-center justify-center mb-2 ${activeGuide.color}`}>
+                  <activeGuide.icon className="w-5 h-5" />
+                </div>
+                <DialogTitle>{activeGuide.label}</DialogTitle>
+                <DialogDescription>{activeGuide.desc}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Langkah-langkah
+                </p>
+                <ol className="space-y-2.5">
+                  {activeGuide.steps.map((step, idx) => (
+                    <li key={idx} className="flex gap-3">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm leading-relaxed pt-0.5">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <DialogFooter className="mt-4">
+                <Button variant="outline" onClick={() => setActiveGuide(null)}>
+                  Tutup
+                </Button>
+                {onNavigate && (
+                  <Button onClick={() => handleGuideAction(activeGuide)}>
+                    {activeGuide.ctaLabel}
+                    <ArrowRight className="w-4 h-4 ml-1.5" />
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

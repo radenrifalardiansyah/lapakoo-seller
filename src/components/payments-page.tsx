@@ -22,6 +22,7 @@ import {
   CreditCard, Building2, AlertCircle, ReceiptText,
   ChevronDown, ChevronUp, Minus,
 } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -380,6 +381,7 @@ function WithdrawDialog({ open, onClose, balance }: { open: boolean; onClose: ()
 const AVAILABLE_YEARS = [2022, 2023, 2024]
 
 export function PaymentsPage() {
+  const { hasFeature } = useTenant()
   // ── existing state ──
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -499,48 +501,48 @@ export function PaymentsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Tersedia</CardTitle>
-            <Wallet className="h-4 w-4 text-green-500" />
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Saldo Tersedia</CardTitle>
+            <Wallet className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-2xl font-bold text-green-600">{formatPrice(balance)}</div>
-            <Button size="sm" className="w-full" onClick={() => setIsWithdrawOpen(true)}>
+          <CardContent className="flex flex-col flex-1">
+            <div className="text-lg xl:text-2xl font-bold text-green-600 truncate leading-tight">{formatPrice(balance)}</div>
+            <Button size="sm" className="w-full mt-auto pt-0" onClick={() => setIsWithdrawOpen(true)}>
               <ArrowDownToLine className="w-3.5 h-3.5 mr-1.5" />Tarik Saldo
             </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Settlement</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Pending Settlement</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{formatPrice(12_800_000)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Dicairkan dalam 1–3 hari kerja</p>
+          <CardContent className="flex flex-col flex-1">
+            <div className="text-lg xl:text-2xl font-bold text-amber-600 truncate leading-tight">{formatPrice(12_800_000)}</div>
+            <p className="text-xs text-muted-foreground mt-auto pt-2">Dicairkan dalam 1–3 hari kerja</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendapatan Bulan Ini</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-500" />
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Pendapatan Bulan Ini</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(185_000_000)}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-green-500" />+12.5% dari bulan lalu
+          <CardContent className="flex flex-col flex-1">
+            <div className="text-lg xl:text-2xl font-bold truncate leading-tight">{formatPrice(185_000_000)}</div>
+            <p className="text-xs text-muted-foreground mt-auto pt-2 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-green-500 shrink-0" />+12.5% dari bulan lalu
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Penarikan</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium truncate">Total Penarikan</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(238_500_000)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Sepanjang waktu</p>
+          <CardContent className="flex flex-col flex-1">
+            <div className="text-lg xl:text-2xl font-bold truncate leading-tight">{formatPrice(238_500_000)}</div>
+            <p className="text-xs text-muted-foreground mt-auto pt-2">Sepanjang waktu</p>
           </CardContent>
         </Card>
       </div>
@@ -611,10 +613,12 @@ export function PaymentsPage() {
                 </SelectContent>
               </Select>
 
-              <Button size="sm" variant="outline" onClick={handleExportReport} className="h-8 text-xs">
-                <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-                Export Laporan
-              </Button>
+              {hasFeature('export-data') && (
+                <Button size="sm" variant="outline" onClick={handleExportReport} className="h-8 text-xs">
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                  Export Laporan
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -877,9 +881,11 @@ export function PaymentsPage() {
                   <SelectItem value="Biaya Admin">Biaya Admin</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={handleExportTx}>
-                <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
-              </Button>
+              {hasFeature('export-data') && (
+                <Button variant="outline" onClick={handleExportTx}>
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
