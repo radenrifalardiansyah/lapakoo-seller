@@ -99,7 +99,7 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
           <div className="w-full md:flex-1 md:max-w-md">
         {/* Login Card */}
         <Card className="border shadow-sm">
-          <CardHeader className="pb-4 pt-6">
+          <CardHeader className="pb-4 pt-6 text-center">
             <CardTitle className="text-lg">Selamat Datang Kembali</CardTitle>
             <CardDescription>
               Masukkan kredensial Anda untuk mengakses dashboard

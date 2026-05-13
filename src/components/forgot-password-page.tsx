@@ -114,7 +114,7 @@ export function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPageProps) {
 
   return sharedLayout(
     <Card className="border shadow-sm">
-      <CardHeader className="pb-4 pt-6">
+      <CardHeader className="pb-4 pt-6 text-center">
         <CardTitle className="text-lg">Lupa Password?</CardTitle>
         <CardDescription>
           Masukkan email Anda dan kami akan mengirimkan link untuk reset password
