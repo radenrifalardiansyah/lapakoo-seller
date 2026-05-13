@@ -3,9 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Store, Eye, EyeOff, Lock, Mail, Crown, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Crown, ShieldCheck, User as UserIcon, ChevronDown } from "lucide-react";
 import { useTenant } from "../contexts/TenantContext";
 import { useAuth } from "../contexts/AuthContext";
+import logoLapakoo from "../assets/images/logo-lapakoo.png";
 
 interface LoginPageProps {
   onForgotPassword: () => void;
@@ -51,6 +52,7 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showDemo, setShowDemo] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -76,39 +78,42 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
     setError("");
   };
 
-  const storeName = tenant?.storeName ?? "Seller Panel";
   const primaryColor = tenant?.primaryColor ?? '#6366f1';
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50 p-4">
-      <div className="w-full max-w-md">
-        {/* Branding */}
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 text-white"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Store className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">{storeName}</h1>
-          <p className="text-sm text-muted-foreground">Masuk ke dashboard penjual Anda</p>
-          {tenant && (
-            <span
-              className="inline-block mt-2 text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-              style={{ backgroundColor: primaryColor }}
-            >
-              Paket {tenant.package.name}
-            </span>
-          )}
-        </div>
+      <div className="w-full max-w-3xl">
+        <div className="flex flex-col md:flex-row items-center gap-8 md:gap-16">
 
+          {/* Left — LapaKoo logo */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center md:text-left">
+            <img
+              src={logoLapakoo}
+              alt="LapaKoo"
+              className="w-full object-contain drop-shadow-lg"
+              style={{ maxWidth: '300px', imageRendering: 'crisp-edges' }}
+            />
+          </div>
+
+          {/* Right — Login form */}
+          <div className="w-full md:flex-1 md:max-w-md">
         {/* Login Card */}
         <Card className="border shadow-sm">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-4 pt-6">
             <CardTitle className="text-lg">Selamat Datang Kembali</CardTitle>
             <CardDescription>
               Masukkan kredensial Anda untuk mengakses dashboard
             </CardDescription>
+            {tenant && (
+              <div className="mt-1">
+                <span
+                  className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-white"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  Paket {tenant.package.name}
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -183,43 +188,59 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
               </Button>
             </form>
 
-            <div className="mt-5 p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <p className="text-xs font-semibold text-slate-600">Demo Credentials</p>
-              <p className="text-[11px] text-slate-500">Klik salah satu untuk auto-fill, password sama: <span className="font-mono">demo123</span></p>
-              <div className="space-y-1.5">
-                {DEMO_ACCOUNTS.map((acc) => {
-                  const Icon = acc.icon;
-                  return (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => fillCredentials(acc)}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 active:bg-slate-50 transition-colors text-left"
-                      disabled={isLoading}
-                    >
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold text-slate-700 leading-tight">
-                          {acc.label} <span className="text-slate-400 font-normal">— {acc.hint}</span>
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-mono truncate">{acc.email}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="mt-5 rounded-xl border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowDemo(!showDemo)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+              >
+                <span className="text-xs font-semibold text-slate-600">Demo Credentials</span>
+                <ChevronDown
+                  className="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"
+                  style={{ transform: showDemo ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+              </button>
+              {showDemo && (
+                <div className="p-3 space-y-2 bg-slate-50">
+                  <p className="text-[11px] text-slate-500">Klik salah satu untuk auto-fill, password sama: <span className="font-mono">demo123</span></p>
+                  <div className="space-y-1.5">
+                    {DEMO_ACCOUNTS.map((acc) => {
+                      const Icon = acc.icon;
+                      return (
+                        <button
+                          key={acc.email}
+                          type="button"
+                          onClick={() => fillCredentials(acc)}
+                          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 active:bg-slate-50 transition-colors text-left"
+                          disabled={isLoading}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold text-slate-700 leading-tight">
+                              {acc.label} <span className="text-slate-400 font-normal">— {acc.hint}</span>
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-mono truncate">{acc.email}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          &copy; {new Date().getFullYear()} {storeName}. All rights reserved.
+          &copy; {new Date().getFullYear()} LapaKoo. All rights reserved.
         </p>
+          </div>
+        </div>
       </div>
     </div>
   );

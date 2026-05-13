@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { ShoppingBag, Eye, EyeOff, Lock, Mail, User, Building2, Phone, MapPin } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, User, Building2, Phone, MapPin } from "lucide-react";
+import logoLapakoo from "../assets/images/logo-lapakoo.png";
 
 interface RegisterPageProps {
   onBackToLogin: () => void;
@@ -94,10 +95,9 @@ export function RegisterPage({ onBackToLogin, onRegisterSuccess }: RegisterPageP
       <div className="w-full max-w-2xl my-8">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4">
-            <ShoppingBag className="w-8 h-8" />
+          <div className="mb-4">
+            <img src={logoLapakoo} alt="LapaKoo" className="h-16 mx-auto object-contain" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Seller Management System</h1>
           <p className="text-muted-foreground">
             Daftar sebagai penjual dan mulai berjualan
           </p>

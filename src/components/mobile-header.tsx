@@ -1,5 +1,6 @@
-import { Bell, Store } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
+import miniLogo from '../assets/images/mini-logo-lapakoo.png'
 
 interface MobileHeaderProps {
   userEmail: string
@@ -24,11 +25,13 @@ export function MobileHeader({
     >
       <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white shadow-sm"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Store className="w-4 h-4" />
+          <div className="w-10 h-10 shrink-0 flex items-center justify-center">
+            <img
+              src={miniLogo}
+              alt="LapaKoo"
+              className="w-10 h-10 object-contain drop-shadow-sm"
+              style={{ imageRendering: 'crisp-edges' }}
+            />
           </div>
           <p className="text-[13px] font-semibold text-gray-800 truncate">
             {tenant?.storeName ?? 'Toko Saya'}

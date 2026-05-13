@@ -1,10 +1,11 @@
 import { useState, type ElementType } from 'react'
 import {
   LayoutDashboard, Package, ShoppingCart, BarChart3, Settings,
-  Store, Users, CreditCard, Bell, HelpCircle, LogOut,
+  Users, CreditCard, Bell, HelpCircle, LogOut,
   AlertTriangle, Handshake, Megaphone, UserCog, Warehouse,
   ChevronLeft, ChevronRight, ChevronDown, Brain,
 } from 'lucide-react'
+import miniLogo from '../assets/images/mini-logo-lapakoo.png'
 import { cn } from "./ui/utils"
 import { useTenant } from '../contexts/TenantContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -142,11 +143,13 @@ export function SellerSidebar({
           "flex items-center border-b border-gray-100",
           isDesktopCollapsed ? "px-3 py-4 md:justify-center" : "gap-3 px-5 py-4"
         )}>
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Store className="w-5 h-5" />
+          <div className="w-11 h-11 shrink-0 flex items-center justify-center">
+            <img
+              src={miniLogo}
+              alt="LapaKoo"
+              className="w-11 h-11 object-contain drop-shadow-sm"
+              style={{ imageRendering: 'crisp-edges' }}
+            />
           </div>
           <div className={cn("min-w-0 flex-1", isDesktopCollapsed && "md:hidden")}>
             <p className="text-sm font-bold text-gray-900 leading-tight truncate">
