@@ -3,14 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle2, Store } from "lucide-react";
 import logoLapakoo from "../assets/images/logo-lapakoo.png";
+import { useTenant } from "../contexts/TenantContext";
 
 interface ForgotPasswordPageProps {
   onBackToLogin: () => void;
 }
 
 export function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPageProps) {
+  const { tenant } = useTenant();
+  const primaryColor = tenant?.primaryColor ?? '#6366f1';
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -44,22 +47,66 @@ export function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPageProps) {
   };
 
   const sharedLayout = (card: React.ReactNode) => (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50 p-4">
-      <div className="w-full max-w-3xl">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: 'linear-gradient(135deg, #3b0764 0%, #6d28d9 55%, #4c1d95 100%)' }}>
+
+      {/* Orbs dekoratif */}
+      <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(196,165,255,0.18) 0%, transparent 70%)' }} />
+      <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.15) 0%, transparent 70%)' }} />
+
+      <div className="w-full max-w-3xl relative z-10">
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-16">
-          {/* Left — logo */}
-          <div className="flex-1 flex items-center justify-center">
-            <img
-              src={logoLapakoo}
-              alt="LapaKoo"
-              className="w-full object-contain drop-shadow-lg"
-              style={{ maxWidth: '300px', imageRendering: 'crisp-edges' }}
-            />
+
+          {/* Kiri — logo */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-5">
+            <div className="relative flex items-center gap-5">
+              {/* Glow putih lebar — blend bg putih logo ke background */}
+              <div className="absolute pointer-events-none"
+                style={{
+                  inset: '-120px',
+                  background: 'radial-gradient(ellipse, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 38%, rgba(255,255,255,0.82) 55%, rgba(255,255,255,0.3) 72%, transparent 88%)',
+                  filter: 'blur(18px)',
+                }} />
+              <img
+                src={logoLapakoo}
+                alt="LapaKoo"
+                className="relative z-10 object-contain"
+                style={{ width: tenant ? '130px' : '230px', imageRendering: 'crisp-edges' }}
+              />
+              {tenant && (
+                <>
+                  <div className="relative z-10 w-px h-14" style={{ backgroundColor: primaryColor, opacity: 0.35 }} />
+                  <div className="relative z-10 flex flex-col items-center gap-1.5">
+                    {tenant.logoUrl ? (
+                      <img
+                        src={tenant.logoUrl}
+                        alt={tenant.storeName}
+                        className="h-12 w-12 rounded-xl object-contain"
+                      />
+                    ) : (
+                      <div
+                        className="h-12 w-12 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: `${primaryColor}22`, border: `1.5px solid ${primaryColor}55` }}
+                      >
+                        <Store className="h-6 w-6" style={{ color: primaryColor }} />
+                      </div>
+                    )}
+                    <span className="text-xs font-semibold text-center max-w-[90px] truncate" style={{ color: primaryColor }}>
+                      {tenant.storeName}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-white/35 text-[11px] tracking-[0.2em] uppercase">Belanja Seru, Lapak Ceria</p>
           </div>
-          {/* Right — card */}
+
+          {/* Kanan — form */}
           <div className="w-full md:flex-1 md:max-w-md">
             {card}
-            <p className="text-center text-xs text-muted-foreground mt-4">
+            <p className="text-center text-xs text-white/40 mt-4">
               &copy; {new Date().getFullYear()} LapaKoo. All rights reserved.
             </p>
           </div>

@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
 import {
-  TrendingUp, TrendingDown, ShoppingCart, Package, DollarSign, Eye,
+  TrendingUp, TrendingDown, ShoppingCart, Package, Banknote, Eye,
   Plus, CheckCircle2, Circle, Trash2, Megaphone, X,
   AlertTriangle, Info, Tag, Star, Target, Users,
   Clock, ArrowRight,
@@ -43,7 +43,7 @@ const recentOrders = [
 ]
 
 const businessSummary = [
-  { label: 'Pendapatan Bulan Ini',  value: 'Rp 185.000.000', prev: 'Rp 178.000.000', pct: '+3.9%',  up: true,  icon: DollarSign, color: 'text-green-500' },
+  { label: 'Pendapatan Bulan Ini',  value: 'Rp 185.000.000', prev: 'Rp 178.000.000', pct: '+3.9%',  up: true,  icon: Banknote, color: 'text-green-500' },
   { label: 'Total Pesanan',         value: '645',             prev: '612',             pct: '+5.4%',  up: true,  icon: ShoppingCart, color: 'text-blue-500' },
   { label: 'Pelanggan Baru',        value: '156',             prev: '128',             pct: '+21.9%', up: true,  icon: Users,      color: 'text-purple-500' },
   { label: 'Rata-rata Nilai Pesan', value: 'Rp 875.000',      prev: 'Rp 893.000',     pct: '-2.0%',  up: false, icon: Target,     color: 'text-orange-500' },
