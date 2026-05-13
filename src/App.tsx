@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { TenantProvider, useTenant } from "./contexts/TenantContext";
 import { InventoryProvider, useInventory } from "./contexts/InventoryContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ROLE_LABEL } from "./lib/permissions";
+import { Lock } from "lucide-react";
 import { SellerSidebar } from "./components/seller-sidebar";
 import { DashboardOverview } from "./components/dashboard-overview";
 import { ProductManagement } from "./components/product-management";
@@ -104,10 +107,9 @@ function TenantErrorScreen({ message }: { message: string }) {
 function AppInner() {
   const { tenant, loading, error, hasFeature } = useTenant();
   const { products, totalStockOf } = useInventory();
+  const { user, loading: authLoading, logout, canAccessTab } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [productAction, setProductAction] = useState<'add' | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -120,32 +122,25 @@ function AppInner() {
     setProductAction("add");
   };
 
-  if (loading) return <TenantLoadingScreen />;
+  if (loading || authLoading) return <TenantLoadingScreen />;
   if (error)   return <TenantErrorScreen message={error} />;
 
-  const handleLogin = (email: string) => {
-    setIsAuthenticated(true);
-    setUserEmail(email);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUserEmail("");
+  const handleLogout = async () => {
+    await logout();
     setActiveTab("dashboard");
     setShowForgotPassword(false);
   };
 
-  if (!isAuthenticated) {
+  if (!user) {
     if (showForgotPassword) {
       return <ForgotPasswordPage onBackToLogin={() => setShowForgotPassword(false)} />;
     }
     return (
-      <LoginPage
-        onLogin={handleLogin}
-        onForgotPassword={() => setShowForgotPassword(true)}
-      />
+      <LoginPage onForgotPassword={() => setShowForgotPassword(true)} />
     );
   }
+
+  const userEmail = user.email;
 
   const renderContent = () => {
     if (!hasFeature(activeTab as Parameters<typeof hasFeature>[0])) {
@@ -155,6 +150,17 @@ function AppInner() {
           <p className="font-semibold text-gray-700">Fitur tidak tersedia</p>
           <p className="text-sm text-muted-foreground text-center">
             Fitur ini tidak termasuk dalam paket <strong>{tenant?.package.name}</strong> Anda.
+          </p>
+        </div>
+      );
+    }
+    if (!canAccessTab(activeTab)) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 space-y-3">
+          <Lock className="w-10 h-10 text-gray-400" />
+          <p className="font-semibold text-gray-700">Akses ditolak</p>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Role <strong>{ROLE_LABEL[user.role]}</strong> tidak memiliki izin untuk membuka halaman ini.
           </p>
         </div>
       );
@@ -269,9 +275,11 @@ function AppInner() {
 export default function App() {
   return (
     <TenantProvider>
-      <InventoryProvider>
-        <AppInner />
-      </InventoryProvider>
+      <AuthProvider>
+        <InventoryProvider>
+          <AppInner />
+        </InventoryProvider>
+      </AuthProvider>
     </TenantProvider>
   );
 }

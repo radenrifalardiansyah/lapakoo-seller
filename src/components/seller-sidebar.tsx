@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from "./ui/utils"
 import { useTenant } from '../contexts/TenantContext'
+import { useAuth } from '../contexts/AuthContext'
 import type { FeatureKey } from '../types/tenant'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 import { getPackageTheme } from '../lib/packageTheme'
@@ -52,6 +53,7 @@ export function SellerSidebar({
     () => localStorage.getItem('sidebar-today-collapsed') === 'true'
   )
   const { tenant, hasFeature } = useTenant()
+  const { canAccessTab } = useAuth()
 
   const toggleDesktop = () => {
     setIsDesktopCollapsed(v => {
@@ -121,8 +123,8 @@ export function SellerSidebar({
     return btn
   }
 
-  const visibleMain   = mainNavItems.filter(item => hasFeature(item.id))
-  const visibleBottom = bottomNavItems.filter(item => hasFeature(item.id))
+  const visibleMain   = mainNavItems.filter(item => hasFeature(item.id) && canAccessTab(item.id))
+  const visibleBottom = bottomNavItems.filter(item => hasFeature(item.id) && canAccessTab(item.id))
 
   return (
     <>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { cn } from './ui/utils'
 import { useTenant } from '../contexts/TenantContext'
+import { useAuth } from '../contexts/AuthContext'
 import type { FeatureKey } from '../types/tenant'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 
@@ -45,6 +46,7 @@ export function MobileBottomNav({
 }: MobileBottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const { tenant, hasFeature } = useTenant()
+  const { canAccessTab } = useAuth()
   const primaryColor = tenant?.primaryColor ?? '#6366f1'
 
   const badgeFor = (id: string): number | undefined => {
@@ -55,8 +57,8 @@ export function MobileBottomNav({
     return undefined
   }
 
-  const visiblePrimary = primaryTabs.filter(t => hasFeature(t.id))
-  const visibleMore    = moreItems.filter(t => hasFeature(t.id))
+  const visiblePrimary = primaryTabs.filter(t => hasFeature(t.id) && canAccessTab(t.id))
+  const visibleMore    = moreItems.filter(t => hasFeature(t.id) && canAccessTab(t.id))
   const isMoreActive   = moreItems.some(m => m.id === activeTab)
 
   const handleTap = (id: string) => {
