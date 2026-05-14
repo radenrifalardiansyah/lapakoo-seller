@@ -4,6 +4,7 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from './ui/pagination'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { TruncatedText } from './ui/truncated-text'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
@@ -406,7 +407,7 @@ function CustomerDetailDialog({
           <div className="space-y-2.5 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Mail className="w-4 h-4 shrink-0" />
-              <span className="truncate">{customer.email}</span>
+              <TruncatedText as="span" className="truncate">{customer.email}</TruncatedText>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Phone className="w-4 h-4 shrink-0" />
@@ -428,11 +429,11 @@ function CustomerDetailDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-muted p-3 min-w-0">
               <p className="text-xs text-muted-foreground">Total Pesanan</p>
-              <p className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{customer.totalOrders}</p>
+              <TruncatedText className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{customer.totalOrders}</TruncatedText>
             </div>
             <div className="rounded-lg bg-muted p-3 min-w-0">
               <p className="text-xs text-muted-foreground">Total Belanja</p>
-              <p className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{formatPrice(customer.totalSpend)}</p>
+              <TruncatedText className="text-xl font-bold mt-0.5 text-right tabular-nums truncate">{formatPrice(customer.totalSpend)}</TruncatedText>
             </div>
           </div>
 
@@ -450,7 +451,7 @@ function CustomerDetailDialog({
               {customer.orders.slice(0, 3).map(order => (
                 <div key={order.id} className="flex items-center justify-between gap-3 text-sm p-2.5 rounded-lg border bg-card">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{order.product}</p>
+                    <TruncatedText className="font-medium truncate">{order.product}</TruncatedText>
                     <p className="text-xs text-muted-foreground tabular-nums">{order.id} · {formatDate(order.date)}</p>
                   </div>
                   <p className="font-semibold shrink-0 text-right tabular-nums">{formatPrice(order.amount)}</p>
@@ -655,7 +656,7 @@ function CustomerHistoryDialog({
                 <p className="text-xs font-medium text-blue-700 truncate">Total Pesanan</p>
                 <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               </div>
-              <p className="text-xl font-bold text-blue-900 mt-1 text-right tabular-nums truncate">{analytics.totalOrders}</p>
+              <TruncatedText className="text-xl font-bold text-blue-900 mt-1 text-right tabular-nums truncate">{analytics.totalOrders}</TruncatedText>
               <p className="text-[10px] text-blue-600 mt-0.5 tabular-nums">
                 {analytics.completedOrders} selesai · {analytics.cancelledOrders} batal
               </p>
@@ -665,27 +666,27 @@ function CustomerHistoryDialog({
                 <p className="text-xs font-medium text-green-700 truncate">Total Belanja</p>
                 <Wallet className="w-3.5 h-3.5 text-green-500 shrink-0" />
               </div>
-              <p className="text-lg font-bold text-green-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.totalSpend)}</p>
-              <p className="text-[10px] text-green-600 mt-0.5 tabular-nums truncate">
+              <TruncatedText className="text-lg font-bold text-green-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.totalSpend)}</TruncatedText>
+              <TruncatedText className="text-[10px] text-green-600 mt-0.5 tabular-nums truncate">
                 AOV: {formatPrice(Math.round(analytics.aov))}
-              </p>
+              </TruncatedText>
             </div>
             <div className="rounded-xl p-3 bg-amber-50 border border-amber-100 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-amber-700 truncate">Kategori Favorit</p>
                 <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               </div>
-              <p className="text-base font-bold text-amber-900 mt-1 truncate">{analytics.favoriteCategory}</p>
-              <p className="text-[10px] text-amber-600 mt-0.5 tabular-nums truncate">
+              <TruncatedText className="text-base font-bold text-amber-900 mt-1 truncate">{analytics.favoriteCategory}</TruncatedText>
+              <TruncatedText className="text-[10px] text-amber-600 mt-0.5 tabular-nums truncate">
                 {formatPrice(analytics.favoriteCategoryAmount)}
-              </p>
+              </TruncatedText>
             </div>
             <div className="rounded-xl p-3 bg-purple-50 border border-purple-100 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-purple-700 truncate">Lifetime Value</p>
                 <BarChart3 className="w-3.5 h-3.5 text-purple-500 shrink-0" />
               </div>
-              <p className="text-lg font-bold text-purple-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.lifetimeValue)}</p>
+              <TruncatedText className="text-lg font-bold text-purple-900 mt-1 text-right tabular-nums truncate">{formatPrice(analytics.lifetimeValue)}</TruncatedText>
               <p className="text-[10px] text-purple-600 mt-0.5 tabular-nums">
                 {analytics.orderFrequency.toFixed(1)} pesanan / bulan
               </p>
@@ -846,7 +847,7 @@ export function CustomersPage() {
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">1.247</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">1.247</TruncatedText>
             <p className="text-xs text-muted-foreground">pelanggan terdaftar</p>
           </CardContent>
         </Card>
@@ -857,7 +858,7 @@ export function CustomersPage() {
             <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">+{newThisMonth}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">+{newThisMonth}</TruncatedText>
             <p className="text-xs text-muted-foreground">bergabung bulan ini</p>
           </CardContent>
         </Card>
@@ -868,7 +869,7 @@ export function CustomersPage() {
             <ShoppingBag className="h-4 w-4 text-blue-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{activeCustomers}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{activeCustomers}</TruncatedText>
             <p className="text-xs text-muted-foreground">aktif bertransaksi</p>
           </CardContent>
         </Card>
@@ -879,7 +880,7 @@ export function CustomersPage() {
             <Star className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{formatPrice(avgClv)}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{formatPrice(avgClv)}</TruncatedText>
             <p className="text-xs text-muted-foreground">customer lifetime value</p>
           </CardContent>
         </Card>
@@ -951,8 +952,8 @@ export function CustomersPage() {
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <p className="font-medium truncate">{customer.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{customer.email}</p>
+                            <TruncatedText className="font-medium truncate">{customer.name}</TruncatedText>
+                            <TruncatedText className="text-xs text-muted-foreground truncate">{customer.email}</TruncatedText>
                           </div>
                         </div>
                       </TableCell>

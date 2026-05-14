@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
+import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -340,7 +341,7 @@ function VoucherFormDialog({
               <Input type="text" inputMode="numeric" value={form.minPurchase}
                 onChange={e => set('minPurchase', e.target.value.replace(/\D/g, ''))}
                 onFocus={e => e.target.select()} placeholder="0" />
-              {form.minPurchase && <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.minPurchase))}</p>}
+              {form.minPurchase && <TruncatedText className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.minPurchase))}</TruncatedText>}
             </div>
             {form.type === 'percentage' && (
               <div className="space-y-1.5 min-w-0">
@@ -348,7 +349,7 @@ function VoucherFormDialog({
                 <Input type="text" inputMode="numeric" value={form.maxDiscount}
                   onChange={e => set('maxDiscount', e.target.value.replace(/\D/g, ''))}
                   onFocus={e => e.target.select()} placeholder="Opsional" />
-                {form.maxDiscount && <p className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.maxDiscount))}</p>}
+                {form.maxDiscount && <TruncatedText className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.maxDiscount))}</TruncatedText>}
               </div>
             )}
           </div>
@@ -497,12 +498,12 @@ function FlashSaleFormDialog({
                 {form.items.map(item => (
                   <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.productName}</p>
-                      <p className="text-xs text-muted-foreground tabular-nums truncate">
+                      <TruncatedText className="font-medium truncate">{item.productName}</TruncatedText>
+                      <TruncatedText className="text-xs text-muted-foreground tabular-nums truncate">
                         Normal: {formatPrice(item.originalPrice)} →
                         <span className="text-red-600 font-semibold ml-1">{formatPrice(item.salePrice)}</span>
                         <span className="ml-1 text-green-600">(-{discountPct(item.originalPrice, item.salePrice)}%)</span>
-                      </p>
+                      </TruncatedText>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs text-muted-foreground tabular-nums">Kuota: <strong>{item.quota}</strong></p>
@@ -613,7 +614,7 @@ function FlashSaleCard({
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <FlashSaleStatusBadge status={status} />
             </div>
-            <h3 className="font-bold text-base">{fs.name}</h3>
+            <TruncatedText as="p" className="font-bold text-base truncate">{fs.name}</TruncatedText>
             <p className="text-xs text-muted-foreground mt-0.5">
               {formatDateTime(fs.startDateTime)} — {formatDateTime(fs.endDateTime)}
             </p>
@@ -669,7 +670,7 @@ function FlashSaleCard({
             {fs.items.map(item => (
               <div key={item.productId} className="flex items-center justify-between gap-3 p-2.5 bg-muted/40 rounded-lg text-sm">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-xs truncate">{item.productName}</p>
+                  <TruncatedText className="font-medium text-xs truncate">{item.productName}</TruncatedText>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-muted-foreground line-through text-[10px] tabular-nums whitespace-nowrap">{formatPrice(item.originalPrice)}</span>
                     <span className="text-red-600 font-bold text-xs tabular-nums whitespace-nowrap">{formatPrice(item.salePrice)}</span>
@@ -891,7 +892,7 @@ export function MarketingPage() {
             <Tag className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeVouchers}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold text-green-600 truncate">{activeVouchers}</TruncatedText>
             <p className="text-xs text-muted-foreground">{scheduledVouchers} terjadwal</p>
           </CardContent>
         </Card>
@@ -901,7 +902,7 @@ export function MarketingPage() {
             <BadgePercent className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVoucherUsed.toLocaleString('id-ID')}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{totalVoucherUsed.toLocaleString('id-ID')}</TruncatedText>
             <p className="text-xs text-muted-foreground">dari {vouchers.length} voucher</p>
           </CardContent>
         </Card>
@@ -911,7 +912,7 @@ export function MarketingPage() {
             <Flame className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{activeFlashSales}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold text-red-600 truncate">{activeFlashSales}</TruncatedText>
             <p className="text-xs text-muted-foreground">berlangsung sekarang</p>
           </CardContent>
         </Card>
@@ -921,7 +922,7 @@ export function MarketingPage() {
             <Zap className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{flashSales.length}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{flashSales.length}</TruncatedText>
             <p className="text-xs text-muted-foreground">{flashSales.filter(fs => getFlashSaleStatus(fs) === 'scheduled').length} terjadwal</p>
           </CardContent>
         </Card>
@@ -1022,7 +1023,7 @@ export function MarketingPage() {
                                       : <Copy className="w-3.5 h-3.5" />}
                                   </button>
                                 </div>
-                                <p className="text-xs text-muted-foreground">{v.name}</p>
+                                <TruncatedText className="text-xs text-muted-foreground truncate">{v.name}</TruncatedText>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">

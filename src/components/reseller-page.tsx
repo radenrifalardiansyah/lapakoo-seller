@@ -2,6 +2,7 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -466,11 +467,11 @@ function ViewResellerDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-blue-50 rounded-lg min-w-0">
                   <p className="text-xs text-blue-600">Total Omzet</p>
-                  <p className="font-bold text-blue-800 text-sm mt-0.5 text-right tabular-nums truncate">{formatPrice(reseller.totalSales)}</p>
+                  <TruncatedText className="font-bold text-blue-800 text-sm mt-0.5 text-right tabular-nums truncate">{formatPrice(reseller.totalSales)}</TruncatedText>
                 </div>
                 <div className="p-3 bg-indigo-50 rounded-lg min-w-0">
                   <p className="text-xs text-indigo-600">Total Pesanan</p>
-                  <p className="font-bold text-indigo-800 text-lg mt-0.5 text-right tabular-nums truncate">{reseller.totalOrders}</p>
+                  <TruncatedText className="font-bold text-indigo-800 text-lg mt-0.5 text-right tabular-nums truncate">{reseller.totalOrders}</TruncatedText>
                 </div>
               </div>
               {reseller.totalOrders > 0 && (
@@ -489,15 +490,15 @@ function ViewResellerDialog({
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-amber-600">Rate Komisi</p>
-                <p className="text-2xl font-bold text-amber-700 tabular-nums truncate">{biz.commission}%</p>
+                <TruncatedText className="text-2xl font-bold text-amber-700 tabular-nums truncate">{biz.commission}%</TruncatedText>
               </div>
               <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-orange-600">Menunggu Bayar</p>
-                <p className="font-bold text-orange-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</p>
+                <TruncatedText className="font-bold text-orange-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</TruncatedText>
               </div>
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center min-w-0">
                 <p className="text-xs text-green-600">Sudah Dibayar</p>
-                <p className="font-bold text-green-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.paidCommission)}</p>
+                <TruncatedText className="font-bold text-green-700 mt-0.5 text-sm tabular-nums truncate">{formatPrice(reseller.paidCommission)}</TruncatedText>
               </div>
             </div>
             {totalCommission > 0 && (
@@ -793,7 +794,7 @@ function PayCommissionDialog({
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
             <p className="text-sm text-amber-700">Komisi yang akan dibayarkan ke</p>
             <p className="font-bold text-lg mt-1">{reseller.name}</p>
-            <p className="text-2xl font-bold text-amber-700 mt-2 tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</p>
+            <TruncatedText className="text-2xl font-bold text-amber-700 mt-2 tabular-nums truncate">{formatPrice(reseller.pendingCommission)}</TruncatedText>
             <p className="text-xs text-amber-600 mt-1">
               Tier {reseller.tier} · {tierSettings[reseller.tier].commission}% komisi
             </p>
@@ -1053,7 +1054,7 @@ export function ResellerPage() {
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</TruncatedText>
             <p className="text-xs text-muted-foreground tabular-nums">{stats.active} aktif</p>
           </CardContent>
         </Card>
@@ -1063,7 +1064,7 @@ export function ResellerPage() {
             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending}</TruncatedText>
             <p className="text-xs text-muted-foreground">perlu ditinjau</p>
           </CardContent>
         </Card>
@@ -1073,7 +1074,7 @@ export function ResellerPage() {
             <Coins className="h-4 w-4 text-orange-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600 text-right tabular-nums truncate">{formatPrice(stats.totalPending)}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-orange-600 text-right tabular-nums truncate">{formatPrice(stats.totalPending)}</TruncatedText>
             <p className="text-xs text-muted-foreground">belum dibayarkan</p>
           </CardContent>
         </Card>
@@ -1083,7 +1084,7 @@ export function ResellerPage() {
             <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.totalPaid)}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.totalPaid)}</TruncatedText>
             <p className="text-xs text-muted-foreground">sepanjang waktu</p>
           </CardContent>
         </Card>

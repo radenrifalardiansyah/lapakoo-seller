@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
@@ -204,7 +205,7 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
         </CardHeader>
         <CardContent className="space-y-5">
           {/* KPI grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {businessSummary.map((item, i) => {
               const Icon = item.icon
               return (
@@ -213,9 +214,9 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
                     <p className="text-xs text-muted-foreground truncate">{item.label}</p>
                     <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
                   </div>
-                  <p className="text-xl font-bold text-right tabular-nums truncate">{item.value}</p>
+                  <TruncatedText className="text-xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground tabular-nums truncate">{item.prev}</p>
+                    <TruncatedText className="text-xs text-muted-foreground tabular-nums truncate">{item.prev}</TruncatedText>
                     <span className={`flex items-center gap-0.5 text-xs font-semibold tabular-nums shrink-0 ${item.up ? 'text-green-600' : 'text-red-500'}`}>
                       {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                       {item.pct}
@@ -243,11 +244,11 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
                     <div className="w-full bg-muted rounded-full h-2">
                       <div className={`${t.color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-xs text-muted-foreground tabular-nums text-right truncate">
+                    <TruncatedText className="text-xs text-muted-foreground tabular-nums text-right truncate">
                       {typeof t.current === 'number' && t.current > 1000
                         ? `${formatPrice(t.current)} / ${formatPrice(t.target)}`
                         : `${t.current} / ${t.target}`}
-                    </p>
+                    </TruncatedText>
                   </div>
                 )
               })}
@@ -315,10 +316,10 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
                 <div key={order.id} className={`flex items-center gap-4 py-3 ${i < recentOrders.length - 1 ? 'border-b' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-sm font-medium">{order.id}</p>
-                    <p className="text-xs text-muted-foreground truncate">{order.customer}</p>
+                    <TruncatedText className="text-xs text-muted-foreground truncate">{order.customer}</TruncatedText>
                   </div>
                   <div className="flex-1 min-w-0 hidden sm:block">
-                    <p className="text-sm truncate">{order.product}</p>
+                    <TruncatedText className="text-sm truncate">{order.product}</TruncatedText>
                     <p className="text-xs text-muted-foreground">{order.date}</p>
                   </div>
                   <div className="text-right shrink-0">

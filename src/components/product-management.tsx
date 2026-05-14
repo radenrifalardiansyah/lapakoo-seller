@@ -6,6 +6,7 @@ import {
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -578,7 +579,7 @@ function ViewProductDialog({
               className="w-24 h-24 rounded-xl object-cover border"
             />
             <div className="flex-1 space-y-1">
-              <p className="font-semibold text-lg leading-tight">{product.name}</p>
+              <TruncatedText className="font-semibold text-lg leading-tight truncate">{product.name}</TruncatedText>
               <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
               <StatusBadge stock={total} />
             </div>
@@ -587,21 +588,21 @@ function ViewProductDialog({
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="min-w-0">
               <p className="text-muted-foreground">Kategori</p>
-              <p className="font-medium truncate">{product.category}</p>
+              <TruncatedText className="font-medium truncate">{product.category}</TruncatedText>
             </div>
             <div className="min-w-0">
               <p className="text-muted-foreground">Harga</p>
-              <p className="font-medium tabular-nums truncate">{formatPrice(product.price)}</p>
+              <TruncatedText className="font-medium tabular-nums truncate">{formatPrice(product.price)}</TruncatedText>
             </div>
             <div className="min-w-0">
               <p className="text-muted-foreground">Total Stok</p>
-              <p className={`font-medium tabular-nums truncate ${total === 0 ? 'text-red-600' : total <= 5 ? 'text-orange-600' : ''}`}>
+              <TruncatedText className={`font-medium tabular-nums truncate ${total === 0 ? 'text-red-600' : total <= 5 ? 'text-orange-600' : ''}`}>
                 {total} unit
-              </p>
+              </TruncatedText>
             </div>
             <div className="min-w-0">
               <p className="text-muted-foreground">Berat</p>
-              <p className="font-medium tabular-nums truncate">{product.weight ?? '-'} gram</p>
+              <TruncatedText className="font-medium tabular-nums truncate">{product.weight ?? '-'} gram</TruncatedText>
             </div>
           </div>
 
@@ -1087,7 +1088,7 @@ export function ProductManagement({
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{products.length}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{products.length}</TruncatedText>
             <p className="text-xs text-muted-foreground">produk terdaftar</p>
           </CardContent>
         </Card>
@@ -1097,7 +1098,7 @@ export function ProductManagement({
             <Package className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeCount}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{activeCount}</TruncatedText>
             <p className="text-xs text-muted-foreground">dengan stok cukup</p>
           </CardContent>
         </Card>
@@ -1107,7 +1108,7 @@ export function ProductManagement({
             <AlertTriangle className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{lowCount}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{lowCount}</TruncatedText>
             <p className="text-xs text-muted-foreground">perlu restock</p>
           </CardContent>
         </Card>
@@ -1117,7 +1118,7 @@ export function ProductManagement({
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{outCount}</div>
+            <TruncatedText as="div" className="text-2xl text-right font-bold truncate">{outCount}</TruncatedText>
             <p className="text-xs text-muted-foreground">segera restock</p>
           </CardContent>
         </Card>

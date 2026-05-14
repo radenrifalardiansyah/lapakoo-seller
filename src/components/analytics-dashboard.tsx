@@ -1,3 +1,4 @@
+import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
@@ -120,7 +121,7 @@ export function AnalyticsDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { title: 'Total Pendapatan',         value: formatPrice(125000000), trend: '+15.2%', up: true,  icon: DollarSign,   color: 'text-green-500' },
           { title: 'Tingkat Konversi',          value: '4.35%',                trend: '+0.8%',  up: true,  icon: ShoppingCart, color: 'text-blue-500' },
@@ -135,7 +136,7 @@ export function AnalyticsDashboard() {
                 <Icon className={`h-4 w-4 ${item.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-right tabular-nums">{item.value}</div>
+                <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
                 <p className={`text-xs flex items-center justify-end gap-1 mt-1 tabular-nums ${item.up ? 'text-green-600' : 'text-red-500'}`}>
                   {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {item.trend} dari periode sebelumnya
@@ -189,7 +190,7 @@ export function AnalyticsDashboard() {
                   <div key={i}>
                     <div className="flex items-center justify-between mb-1 gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{p.nama}</p>
+                        <TruncatedText className="text-sm font-medium truncate">{p.nama}</TruncatedText>
                         <p className="text-xs text-muted-foreground tabular-nums">{p.pesanan} pesanan</p>
                       </div>
                       <div className="text-right shrink-0">
@@ -220,7 +221,7 @@ export function AnalyticsDashboard() {
                   {trafficSourceData.map((item, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-muted-foreground truncate">{item.sumber}</span>
+                      <TruncatedText as="span" className="text-muted-foreground truncate">{item.sumber}</TruncatedText>
                       <span className="ml-auto font-medium">{item.pengunjung}%</span>
                     </div>
                   ))}

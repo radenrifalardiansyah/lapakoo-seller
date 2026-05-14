@@ -4,6 +4,7 @@ import {
   AlertTriangle, PackageCheck, Target, ArrowRight, Crown,
   BadgePercent, Clock, RefreshCw, Boxes,
 } from 'lucide-react'
+import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -325,11 +326,12 @@ export function AIInsightsPage() {
       </Card>
 
       {/* ── KPI Cards ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
             title: 'Prediksi Pendapatan',
             value: formatShort(totals.fcstRev),
+            fullValue: formatPrice(totals.fcstRev),
             sub: `${horizon} hari ke depan`,
             icon: Target,
             color: 'text-violet-500',
@@ -370,8 +372,8 @@ export function AIInsightsPage() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{kpi.title}</p>
-                <p className="text-2xl font-bold mt-0.5 tabular-nums">{kpi.value}</p>
-                <p className="text-xs text-muted-foreground mt-1 truncate">{kpi.sub}</p>
+                <TruncatedText className="text-2xl text-right font-bold mt-0.5 tabular-nums truncate" tip={kpi.fullValue}>{kpi.value}</TruncatedText>
+                <TruncatedText className="text-xs text-muted-foreground mt-1 truncate">{kpi.sub}</TruncatedText>
               </CardContent>
             </Card>
           )
@@ -428,7 +430,7 @@ export function AIInsightsPage() {
                           {i + 1}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">{p.name}</p>
+                          <TruncatedText className="text-sm font-semibold truncate">{p.name}</TruncatedText>
                           <p className="text-xs text-muted-foreground">
                             {p.category} · {p.avgDailySales.toFixed(1)} unit/hari
                             {p.trendPct > 0 && (
@@ -445,7 +447,7 @@ export function AIInsightsPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-bold tabular-nums">{formatShort(revFcst)}</p>
+                        <TruncatedText className="text-sm font-bold tabular-nums" tip={formatPrice(revFcst)}>{formatShort(revFcst)}</TruncatedText>
                         <p className="text-xs text-muted-foreground tabular-nums">{unitFcst} unit</p>
                       </div>
                     </div>
@@ -591,7 +593,7 @@ export function AIInsightsPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {(['critical', 'high', 'medium', 'low'] as const).map(level => {
               const count = restockList.filter(s => s.urgency === level).length
               const b = urgencyBadge(level)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -456,8 +457,8 @@ function CancelOrderDialog({
               {orders.map(o => (
                 <div key={o.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="font-mono text-sm font-medium truncate">{o.id}</p>
-                    <p className="text-xs text-muted-foreground truncate">{o.customer.name}</p>
+                    <TruncatedText className="font-mono text-sm font-medium truncate">{o.id}</TruncatedText>
+                    <TruncatedText className="text-xs text-muted-foreground truncate">{o.customer.name}</TruncatedText>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-medium tabular-nums whitespace-nowrap">{formatPrice(o.total)}</p>
@@ -570,7 +571,7 @@ function ReturDialog({
           {/* Order info */}
           <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
             <div className="flex justify-between gap-2">
-              <span className="font-mono font-medium truncate">{order.id}</span>
+              <TruncatedText as="span" className="font-mono font-medium truncate">{order.id}</TruncatedText>
               <span className="font-medium tabular-nums whitespace-nowrap shrink-0">{formatPrice(order.total)}</span>
             </div>
             <p className="text-muted-foreground">{order.customer.name}</p>
@@ -1338,7 +1339,7 @@ export function OrderManagement() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{stats.total}</TruncatedText>
             <p className="text-xs text-muted-foreground">semua pesanan</p>
           </CardContent>
         </Card>
@@ -1348,7 +1349,7 @@ export function OrderManagement() {
             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending + stats.processing}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-amber-600 text-right tabular-nums truncate">{stats.pending + stats.processing}</TruncatedText>
             <p className="text-xs text-muted-foreground">menunggu & diproses</p>
           </CardContent>
         </Card>
@@ -1358,7 +1359,7 @@ export function OrderManagement() {
             <Truck className="h-4 w-4 text-indigo-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-indigo-600 text-right tabular-nums truncate">{stats.shipped}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-indigo-600 text-right tabular-nums truncate">{stats.shipped}</TruncatedText>
             <p className="text-xs text-muted-foreground">dalam perjalanan</p>
           </CardContent>
         </Card>
@@ -1368,7 +1369,7 @@ export function OrderManagement() {
             <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.revenue)}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-green-600 text-right tabular-nums truncate">{formatPrice(stats.revenue)}</TruncatedText>
             <p className="text-xs text-muted-foreground">dari pesanan lunas</p>
           </CardContent>
         </Card>

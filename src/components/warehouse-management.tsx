@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { TruncatedText } from './ui/truncated-text'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -839,7 +840,7 @@ export function WarehouseManagement() {
             <Warehouse className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{warehouses.length}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{warehouses.length}</TruncatedText>
             <p className="text-xs text-muted-foreground tabular-nums">{activeCount} aktif</p>
           </CardContent>
         </Card>
@@ -849,7 +850,7 @@ export function WarehouseManagement() {
             <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{totalStock.toLocaleString('id-ID')}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{totalStock.toLocaleString('id-ID')}</TruncatedText>
             <p className="text-xs text-muted-foreground">unit di semua gudang</p>
           </CardContent>
         </Card>
@@ -859,7 +860,7 @@ export function WarehouseManagement() {
             <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{products.length}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{products.length}</TruncatedText>
             <p className="text-xs text-muted-foreground">SKU di sistem</p>
           </CardContent>
         </Card>
@@ -869,7 +870,7 @@ export function WarehouseManagement() {
             <History className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-right tabular-nums truncate">{movements.length}</div>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{movements.length}</TruncatedText>
             <p className="text-xs text-muted-foreground">transaksi tercatat</p>
           </CardContent>
         </Card>
