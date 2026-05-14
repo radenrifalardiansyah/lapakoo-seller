@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { SplashScreen } from "./components/splash-screen";
 import { TenantProvider, useTenant } from "./contexts/TenantContext";
 import { InventoryProvider, useInventory } from "./contexts/InventoryContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -27,6 +28,16 @@ import { MobileBottomNav } from "./components/mobile-bottom-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./components/ui/alert-dialog";
 import { Bell, LogOut, Store, AlertTriangle, ChevronDown } from "lucide-react";
 
 function NotificationsPage() {
@@ -104,7 +115,7 @@ function TenantErrorScreen({ message }: { message: string }) {
 
 // ─── Inner app (has access to TenantContext) ──────────────────────────────────
 
-function AppInner() {
+function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
   const { tenant, loading, error, hasFeature } = useTenant();
   const { products, totalStockOf } = useInventory();
   const { user, loading: authLoading, logout, canAccessTab } = useAuth();
@@ -112,6 +123,7 @@ function AppInner() {
   const [productAction, setProductAction] = useState<'add' | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const goToOrders = () => {
     setActiveTab("orders");
@@ -122,14 +134,18 @@ function AppInner() {
     setProductAction("add");
   };
 
-  if (loading || authLoading) return <TenantLoadingScreen />;
-  if (error)   return <TenantErrorScreen message={error} />;
-
   const handleLogout = async () => {
     await logout();
     setActiveTab("dashboard");
     setShowForgotPassword(false);
+    setShowLogoutConfirm(false);
+    onLogoutComplete();
   };
+
+  const requestLogout = () => setShowLogoutConfirm(true);
+
+  if (loading || authLoading) return <TenantLoadingScreen />;
+  if (error)   return <TenantErrorScreen message={error} />;
 
   if (!user) {
     if (showForgotPassword) {
@@ -201,7 +217,7 @@ function AppInner() {
       <SellerSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onLogout={handleLogout}
+        onLogout={requestLogout}
         productBadge={productBadge}
         orderBadge={orderBadge}
         resellerBadge={resellerBadge}
@@ -234,7 +250,7 @@ function AppInner() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleLogout}
+              onClick={requestLogout}
               className="flex items-center gap-2 text-gray-500 hover:text-red-500 hover:bg-red-50"
             >
               <LogOut className="w-4 h-4" />
@@ -251,7 +267,7 @@ function AppInner() {
       <MobileBottomNav
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onLogout={handleLogout}
+        onLogout={requestLogout}
         productBadge={productBadge}
         orderBadge={orderBadge}
         resellerBadge={resellerBadge}
@@ -264,8 +280,31 @@ function AppInner() {
         userEmail={userEmail}
         tenant={tenant}
         onGoToSettings={() => setActiveTab('settings')}
-        onLogout={handleLogout}
+        onLogout={requestLogout}
       />
+
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <LogOut className="w-5 h-5 text-red-500" />
+              Keluar dari Aplikasi
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin keluar? Anda perlu login kembali untuk mengakses toko Anda.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLogout}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Ya, Keluar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -273,13 +312,22 @@ function AppInner() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+  const handleLogoutComplete = useCallback(() => setSplashDone(false), []);
+
   return (
-    <TenantProvider>
-      <AuthProvider>
-        <InventoryProvider>
-          <AppInner />
-        </InventoryProvider>
-      </AuthProvider>
-    </TenantProvider>
+    <>
+      {!splashDone && <SplashScreen onFinish={handleSplashFinish} />}
+      {splashDone && (
+        <TenantProvider>
+          <AuthProvider>
+            <InventoryProvider>
+              <AppInner onLogoutComplete={handleLogoutComplete} />
+            </InventoryProvider>
+          </AuthProvider>
+        </TenantProvider>
+      )}
+    </>
   );
 }
