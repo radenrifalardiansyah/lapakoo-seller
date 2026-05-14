@@ -250,9 +250,14 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
             <span className="text-white/30 text-[10px] tracking-wider uppercase">Dipersembahkan oleh</span>
             <div className="h-px w-8 bg-white/10" />
           </div>
-          <span className="text-white/50 text-xs font-semibold tracking-wide">
-            PT Ken Solusindo
-          </span>
+          <a
+            href="https://eleven-digital.id"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/50 text-xs font-semibold tracking-wide hover:text-white/70 transition-colors"
+          >
+            PT. Eleven Digital Indonesia
+          </a>
         </div>
       </div>
     </>

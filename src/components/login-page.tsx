@@ -263,6 +263,16 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
 
           <p className="text-center text-xs text-white/40 mt-6">
             &copy; {new Date().getFullYear()} LapaKoo. All rights reserved.
+            <br />
+            by{" "}
+            <a
+              href="https://eleven-digital.id"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white/60 transition-colors underline underline-offset-2"
+            >
+              PT. Eleven Digital Indonesia
+            </a>
           </p>
         </div>
       </div>
