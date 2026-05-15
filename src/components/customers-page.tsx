@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { customersApi, type ApiCustomer } from '../lib/api'
+import { customersApi, ordersApi, type ApiCustomer } from '../lib/api'
 import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -268,11 +268,14 @@ function formatPrice(amount: number) {
 }
 
 function formatDate(dateStr: string) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
   return new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(dateStr))
+  }).format(d)
 }
 
 // ─── Category / status auto-derivation ────────────────────────────────────────
@@ -497,9 +500,12 @@ function deriveSegment(totalOrders: number, totalSpend: number): Segment {
   return 'New'
 }
 
-function mapApiCustomer(c: ApiCustomer): Customer {
-  const totalOrders = Number(c.total_orders) || 0
-  const totalSpend = Number(c.total_spend) || 0
+function mapApiCustomer(c: ApiCustomer, agg?: { count: number; spend: number; lastDate: string; orders: Order[] }): Customer {
+  const totalOrders = agg?.count ?? (Number(c.total_orders) || 0)
+  const totalSpend = agg?.spend ?? (Number(c.total_spend) || 0)
+  const lastOrder = agg?.lastDate
+    ? agg.lastDate.slice(0, 10)
+    : (c.last_order ?? c.last_order_date ?? '')
   return {
     id: Number(c.id),
     name: c.name,
@@ -509,17 +515,9 @@ function mapApiCustomer(c: ApiCustomer): Customer {
     segment: (c.segment as Segment) ?? deriveSegment(totalOrders, totalSpend),
     totalOrders,
     totalSpend,
-    lastOrder: c.last_order ?? c.last_order_date ?? '',
+    lastOrder,
     joinDate: c.join_date ?? c.created_at ?? '',
-    orders: (c.orders ?? []).map(o => ({
-      id: String(o.id),
-      product: (o.items ?? o.order_items ?? [])[0]?.product_name
-        ?? (o.items ?? o.order_items ?? [])[0]?.name
-        ?? '-',
-      amount: Number(o.total_amount ?? o.total) || 0,
-      date: o.created_at ?? o.order_date ?? '',
-      status: o.status as OrderStatus | undefined,
-    })),
+    orders: agg?.orders ?? [],
   }
 }
 
@@ -830,7 +828,7 @@ function CustomerHistoryDialog({
 
 export function CustomersPage() {
   const { hasFeature, tenant } = useTenant()
-  const [customerList, setCustomerList] = useState<Customer[]>(customers)
+  const [customerList, setCustomerList] = useState<Customer[]>([])
   const [customersLoading, setCustomersLoading] = useState(true)
   const [customersError, setCustomersError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -844,8 +842,41 @@ export function CustomersPage() {
     setCustomersLoading(true)
     setCustomersError(null)
     try {
-      const data = await customersApi.list()
-      setCustomerList(data.map(mapApiCustomer))
+      const [customersData, ordersData] = await Promise.all([
+        customersApi.list(),
+        ordersApi.list(),
+      ])
+
+      // Aggregate orders per customer email
+      const aggByEmail = new Map<string, { count: number; spend: number; lastDate: string; orders: Order[] }>()
+      for (const o of ordersData) {
+        const email = (o.customer?.email ?? o.customer_email ?? '').toLowerCase()
+        if (!email) continue
+        const amount = Number(o.total_amount ?? o.total) || 0
+        const date = o.created_at ?? o.order_date ?? ''
+        const existing = aggByEmail.get(email)
+        const orderEntry: Order = {
+          id: String(o.id),
+          product: (o.items ?? o.order_items ?? [])[0]?.product_name
+            ?? (o.items ?? o.order_items ?? [])[0]?.name ?? '-',
+          amount,
+          date: date.slice(0, 10),
+          status: o.status as OrderStatus | undefined,
+        }
+        if (existing) {
+          existing.count++
+          existing.spend += amount
+          if (date > existing.lastDate) existing.lastDate = date
+          existing.orders.unshift(orderEntry)
+        } else {
+          aggByEmail.set(email, { count: 1, spend: amount, lastDate: date, orders: [orderEntry] })
+        }
+      }
+
+      setCustomerList(customersData.map(c => {
+        const agg = aggByEmail.get((c.email ?? '').toLowerCase())
+        return mapApiCustomer(c, agg)
+      }))
     } catch (err) {
       setCustomersError(err instanceof Error ? err.message : 'Gagal memuat pelanggan')
       setCustomerList(customers) // fallback ke mock
