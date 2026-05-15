@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Separator } from "./ui/separator"
+import { Skeleton } from "./ui/skeleton"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Tooltip, PieChart, Pie, Cell,
@@ -18,44 +19,9 @@ import {
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Static UI Data (bukan mock bisnis) ───────────────────────────────────────
 
-const salesData = [
-  { bulan: 'Jan', penjualan: 125000000, pesanan: 450 },
-  { bulan: 'Feb', penjualan: 132000000, pesanan: 478 },
-  { bulan: 'Mar', penjualan: 148000000, pesanan: 520 },
-  { bulan: 'Apr', penjualan: 155000000, pesanan: 545 },
-  { bulan: 'Mei', penjualan: 178000000, pesanan: 612 },
-  { bulan: 'Jun', penjualan: 185000000, pesanan: 645 },
-]
-
-const categoryData = [
-  { nama: 'Electronics',   nilai: 35, color: '#6366f1' },
-  { nama: 'Fashion',       nilai: 25, color: '#06b6d4' },
-  { nama: 'Home & Garden', nilai: 20, color: '#10b981' },
-  { nama: 'Sports',        nilai: 12, color: '#f59e0b' },
-  { nama: 'Books',         nilai: 8,  color: '#f43f5e' },
-]
-
-const recentOrders = [
-  { id: 'ORD-001', customer: 'Ahmad Rizki',    product: 'iPhone 14 Pro Max',     amount: 15999000, status: 'pending',    date: '15 Jan 2024' },
-  { id: 'ORD-002', customer: 'Siti Nurhaliza', product: 'Samsung Galaxy S23 Ultra', amount: 22298000, status: 'shipped',    date: '14 Jan 2024' },
-  { id: 'ORD-003', customer: 'Budi Santoso',   product: 'MacBook Air M2',         amount: 20298000, status: 'delivered',  date: '12 Jan 2024' },
-  { id: 'ORD-004', customer: 'Dewi Lestari',   product: 'Nike Air Jordan 1 x2',  amount: 4998000,  status: 'processing', date: '13 Jan 2024' },
-]
-
-const businessSummary = [
-  { label: 'Pendapatan Bulan Ini',  value: 'Rp 185.000.000', prev: 'Rp 178.000.000', pct: '+3.9%',  up: true,  icon: Banknote, color: 'text-green-500' },
-  { label: 'Total Pesanan',         value: '645',             prev: '612',             pct: '+5.4%',  up: true,  icon: ShoppingCart, color: 'text-blue-500' },
-  { label: 'Pelanggan Baru',        value: '156',             prev: '128',             pct: '+21.9%', up: true,  icon: Users,      color: 'text-purple-500' },
-  { label: 'Rata-rata Nilai Pesan', value: 'Rp 875.000',      prev: 'Rp 893.000',     pct: '-2.0%',  up: false, icon: Target,     color: 'text-orange-500' },
-]
-
-const targetProgress = [
-  { label: 'Target Pendapatan',  current: 185000000, target: 220000000, color: 'bg-blue-500' },
-  { label: 'Target Pesanan',     current: 645,       target: 700,       color: 'bg-green-500' },
-  { label: 'Target Pelanggan',   current: 156,       target: 200,       color: 'bg-purple-500' },
-]
+const PIE_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#ec4899']
 
 const initialAnnouncements = [
   {
@@ -93,12 +59,9 @@ const initialAnnouncements = [
 ]
 
 const initialTasks = [
-  { id: 1, text: 'Proses 2 pesanan yang masih pending',      done: false, priority: 'high' as const },
-  { id: 2, text: 'Restock Nike Air Jordan 1 (sisa 3 unit)',  done: false, priority: 'high' as const },
-  { id: 3, text: 'Balas ulasan pelanggan bulan ini',         done: false, priority: 'medium' as const },
-  { id: 4, text: 'Upload foto produk baru Samsung Tab S9',   done: true,  priority: 'medium' as const },
-  { id: 5, text: 'Perbarui deskripsi MacBook Air M2',        done: false, priority: 'low' as const },
-  { id: 6, text: 'Daftarkan produk ke program flash sale',   done: true,  priority: 'low' as const },
+  { id: 1, text: 'Proses pesanan yang masih pending',     done: false, priority: 'high' as const },
+  { id: 2, text: 'Balas ulasan pelanggan bulan ini',      done: false, priority: 'medium' as const },
+  { id: 3, text: 'Daftarkan produk ke program flash sale', done: false, priority: 'low' as const },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,6 +74,12 @@ function formatShort(v: number) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}Jt`
   if (v >= 1_000) return `${(v / 1_000).toFixed(0)}Rb`
   return String(v)
+}
+
+function formatRp(val: number): string {
+  if (val >= 1_000_000_000) return `Rp ${(val / 1_000_000_000).toFixed(1)} M`
+  if (val >= 1_000_000) return `Rp ${(val / 1_000_000).toFixed(0)} Jt`
+  return `Rp ${val.toLocaleString('id-ID')}`
 }
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
@@ -147,59 +116,98 @@ function PriceTooltip({ active, payload, label }: any) {
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Skeleton Components ───────────────────────────────────────────────────────
 
-function formatRp(val: number): string {
-  if (val >= 1_000_000_000) return `Rp ${(val / 1_000_000_000).toFixed(1)} M`
-  if (val >= 1_000_000) return `Rp ${(val / 1_000_000).toFixed(0)} Jt`
-  return `Rp ${val.toLocaleString('id-ID')}`
+function KpiCardSkeleton() {
+  return (
+    <div className="p-4 rounded-xl border bg-muted/20 space-y-2 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-4 w-4 rounded-full" />
+      </div>
+      <Skeleton className="h-7 w-36 ml-auto" />
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-12" />
+      </div>
+    </div>
+  )
 }
+
+function OrderRowSkeleton() {
+  return (
+    <div className="flex items-center gap-4 py-3 border-b last:border-0">
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-3 w-32" />
+      </div>
+      <div className="flex-1 min-w-0 hidden sm:block space-y-1.5">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+      <div className="text-right shrink-0 space-y-1.5">
+        <Skeleton className="h-4 w-28 ml-auto" />
+        <Skeleton className="h-5 w-20 ml-auto rounded-full" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProduct?: () => void; onViewAllOrders?: () => void } = {}) {
   const { tenant } = useTenant()
   const isStarter = tenant?.package.id === 'starter'
 
   const [stats, setStats] = useState<ApiStoreStats | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    storeApi.stats().then(setStats).catch(() => { /* use mock fallback */ })
+    storeApi.stats()
+      .then(setStats)
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  // Merge API stats into businessSummary
-  const liveSummary = stats ? [
+  // KPI cards from real API data
+  const kpiCards = [
     {
       label: 'Pendapatan Bulan Ini',
-      value: formatRp(Number(stats.revenue_this_month ?? stats.revenue ?? 0)),
-      prev: '-', pct: '', up: true, icon: Banknote, color: 'text-green-500',
+      value: formatRp(Number(stats?.revenue_this_month ?? stats?.revenue ?? 0)),
+      icon: Banknote,
+      color: 'text-green-500',
     },
     {
       label: 'Total Pesanan',
-      value: String(stats.orders_this_month ?? stats.total_orders ?? 0),
-      prev: '-', pct: '', up: true, icon: ShoppingCart, color: 'text-blue-500',
+      value: String(stats?.orders_this_month ?? stats?.total_orders ?? 0),
+      icon: ShoppingCart,
+      color: 'text-blue-500',
     },
     {
       label: 'Pelanggan Baru',
-      value: String(stats.new_customers_this_month ?? stats.new_customers ?? 0),
-      prev: '-', pct: '', up: true, icon: Users, color: 'text-purple-500',
+      value: String(stats?.new_customers_this_month ?? stats?.new_customers ?? 0),
+      icon: Users,
+      color: 'text-purple-500',
     },
     {
       label: 'Rata-rata Nilai Pesan',
-      value: formatRp(Number(stats.average_order_value ?? 0)),
-      prev: '-', pct: '', up: true, icon: Target, color: 'text-orange-500',
+      value: formatRp(Number(stats?.average_order_value ?? 0)),
+      icon: Target,
+      color: 'text-orange-500',
     },
-  ] : businessSummary
+  ]
 
-  const liveSalesData = stats?.sales_chart
+  const salesData = stats?.sales_chart
     ? stats.sales_chart.map(d => ({ bulan: d.month, penjualan: d.sales, pesanan: d.orders }))
-    : salesData
+    : []
 
-  const liveCategoryData = stats?.category_chart
-    ? stats.category_chart.map((d, i) => ({ nama: d.name, nilai: d.value, color: categoryData[i]?.color ?? '#6366f1' }))
-    : categoryData
+  const categoryData = stats?.category_chart
+    ? stats.category_chart.map((d, i) => ({ nama: d.name, nilai: d.value, color: PIE_COLORS[i % PIE_COLORS.length] }))
+    : []
 
-  const liveRecentOrders = stats?.recent_orders
+  const recentOrders = stats?.recent_orders
     ? stats.recent_orders.slice(0, 4).map(o => ({
-        id: String(o.id),
+        id: String(o.order_number ?? o.id),
         customer: o.customer?.name ?? o.customer_name ?? 'Pelanggan',
         product: (o.items ?? o.order_items ?? [])[0]?.product_name
           ?? (o.items ?? o.order_items ?? [])[0]?.name ?? 'Produk',
@@ -207,7 +215,7 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
         status: o.status ?? 'pending',
         date: o.created_at ? new Date(o.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
       }))
-    : recentOrders
+    : []
 
   // Announcements
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
@@ -255,61 +263,28 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Star className="w-4 h-4 text-amber-500" />
-              Ringkasan Bisnis — Juni 2024
+              Ringkasan Bisnis
             </CardTitle>
-            <span className="text-xs text-muted-foreground">vs bulan sebelumnya</span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent>
           {/* KPI grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {liveSummary.map((item, i) => {
-              const Icon = item.icon
-              return (
-                <div key={i} className="p-4 rounded-xl border bg-muted/20 space-y-2 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground truncate">{item.label}</p>
-                    <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
-                  </div>
-                  <TruncatedText className="text-xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
-                  <div className="flex items-center justify-between gap-2">
-                    <TruncatedText className="text-xs text-muted-foreground tabular-nums truncate">{item.prev}</TruncatedText>
-                    <span className={`flex items-center gap-0.5 text-xs font-semibold tabular-nums shrink-0 ${item.up ? 'text-green-600' : 'text-red-500'}`}>
-                      {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {item.pct}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <Separator />
-
-          {/* Target progress */}
-          <div>
-            <p className="text-sm font-semibold mb-3">Pencapaian Target Bulan Ini</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {targetProgress.map((t, i) => {
-                const pct = Math.min(100, Math.round((t.current / t.target) * 100))
-                return (
-                  <div key={i} className="space-y-1.5 min-w-0">
-                    <div className="flex justify-between text-sm gap-2">
-                      <span className="text-muted-foreground truncate">{t.label}</span>
-                      <span className="font-semibold tabular-nums shrink-0">{pct}%</span>
+            {loading
+              ? [...Array(4)].map((_, i) => <KpiCardSkeleton key={i} />)
+              : kpiCards.map((item, i) => {
+                  const Icon = item.icon
+                  return (
+                    <div key={i} className="p-4 rounded-xl border bg-muted/20 space-y-2 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground truncate">{item.label}</p>
+                        <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
+                      </div>
+                      <TruncatedText className="text-xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className={`${t.color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <TruncatedText className="text-xs text-muted-foreground tabular-nums text-right truncate">
-                      {typeof t.current === 'number' && t.current > 1000
-                        ? `${formatPrice(t.current)} / ${formatPrice(t.target)}`
-                        : `${t.current} / ${t.target}`}
-                    </TruncatedText>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })
+            }
           </div>
         </CardContent>
       </Card>
@@ -319,38 +294,61 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
         <Card>
           <CardHeader><CardTitle>Grafik Penjualan Bulanan</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={liveSalesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="bulan" />
-                <YAxis tickFormatter={formatShort} width={55} />
-                <Tooltip content={<PriceTooltip />} />
-                <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <Skeleton className="h-[260px] w-full" />
+            ) : salesData.length === 0 ? (
+              <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">
+                Belum ada data penjualan
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={salesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="bulan" />
+                  <YAxis tickFormatter={formatShort} width={55} />
+                  <Tooltip content={<PriceTooltip />} />
+                  <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>Distribusi Kategori Produk</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={liveCategoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="nilai">
-                  {liveCategoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip formatter={(v: number) => [`${v}%`, 'Porsi']} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3">
-              {liveCategoryData.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-muted-foreground flex-1">{item.nama}</span>
-                  <span className="font-medium">{item.nilai}%</span>
+            {loading ? (
+              <>
+                <Skeleton className="h-[200px] w-full rounded-full mx-auto max-w-[200px]" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : categoryData.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                Belum ada data kategori
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="nilai">
+                      {categoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => [`${v}%`, 'Porsi']} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3">
+                  {categoryData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground flex-1">{item.nama}</span>
+                      <span className="font-medium">{item.nilai}%</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -366,29 +364,40 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-0">
-            {liveRecentOrders.map((order, i) => {
-              const s = STATUS_MAP[order.status] ?? { label: order.status, class: 'bg-muted text-muted-foreground border-muted' }
-              return (
-                <div key={order.id} className={`flex items-center gap-4 py-3 ${i < liveRecentOrders.length - 1 ? 'border-b' : ''}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-sm font-medium">{order.id}</p>
-                    <TruncatedText className="text-xs text-muted-foreground truncate">{order.customer}</TruncatedText>
+          {loading ? (
+            <div className="space-y-0">
+              {[...Array(4)].map((_, i) => <OrderRowSkeleton key={i} />)}
+            </div>
+          ) : recentOrders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Belum ada pesanan</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {recentOrders.map((order, i) => {
+                const s = STATUS_MAP[order.status] ?? { label: order.status, class: 'bg-muted text-muted-foreground border-muted' }
+                return (
+                  <div key={order.id} className={`flex items-center gap-4 py-3 ${i < recentOrders.length - 1 ? 'border-b' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-sm font-medium">{order.id}</p>
+                      <TruncatedText className="text-xs text-muted-foreground truncate">{order.customer}</TruncatedText>
+                    </div>
+                    <div className="flex-1 min-w-0 hidden sm:block">
+                      <TruncatedText className="text-sm truncate">{order.product}</TruncatedText>
+                      <p className="text-xs text-muted-foreground">{order.date}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-semibold tabular-nums">{formatPrice(order.amount)}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium mt-0.5 ${s.class}`}>
+                        {s.label}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0 hidden sm:block">
-                    <TruncatedText className="text-sm truncate">{order.product}</TruncatedText>
-                    <p className="text-xs text-muted-foreground">{order.date}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold tabular-nums">{formatPrice(order.amount)}</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium mt-0.5 ${s.class}`}>
-                      {s.label}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
