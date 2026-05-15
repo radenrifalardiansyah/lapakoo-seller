@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { Tenant, TenantContextValue, FeatureKey, Package } from '../types/tenant';
 import { apiGet } from '../lib/api-client';
 import type { ApiStore } from '../lib/api';
@@ -100,10 +100,44 @@ const TenantContext = createContext<TenantContextValue>({
   resetTenant: () => {},
 });
 
+interface ResolveTenantResponse {
+  id: string | number;
+  subdomain: string;
+  store_name: string;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  status: string;
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(DEFAULT_TENANT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Baca ?tenant= atau ?subdomain= dari URL dan pre-load data toko sebelum login
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('tenant') ?? params.get('subdomain');
+    if (!slug) return;
+
+    setLoading(true);
+    apiGet<ResolveTenantResponse>(`/api/tenants/resolve?tenant=${encodeURIComponent(slug)}`, { skipAuth: true })
+      .then((data) => {
+        setTenant({
+          ...DEFAULT_TENANT,
+          id: String(data.id),
+          subdomain: data.subdomain,
+          storeName: data.store_name,
+          logoUrl: data.logo_url ?? undefined,
+          primaryColor: data.primary_color ?? DEFAULT_TENANT.primaryColor,
+          status: data.status as Tenant['status'],
+        });
+      })
+      .catch(() => {
+        // URL tenant tidak ditemukan — biarkan DEFAULT_TENANT
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const refreshTenant = useCallback(async (token: string) => {
     setLoading(true);
