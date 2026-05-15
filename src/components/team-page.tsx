@@ -23,37 +23,6 @@ interface TeamUser {
   createdAt: string
 }
 
-// ─── Mock initial data (per tenant) ──────────────────────────────────────────
-
-const MOCK_USERS: TeamUser[] = [
-  {
-    id: 1,
-    name: 'Budi Santoso',
-    email: 'budi@tokobudi.seller.id',
-    role: 'owner',
-    status: 'active',
-    lastLogin: '2026-05-12 08:30',
-    createdAt: '2024-01-15',
-  },
-  {
-    id: 2,
-    name: 'Siti Rahayu',
-    email: 'siti@tokobudi.seller.id',
-    role: 'admin',
-    status: 'active',
-    lastLogin: '2026-05-11 14:22',
-    createdAt: '2024-03-10',
-  },
-  {
-    id: 3,
-    name: 'Doni Prasetyo',
-    email: 'doni@tokobudi.seller.id',
-    role: 'staff',
-    status: 'active',
-    lastLogin: '2026-05-10 09:05',
-    createdAt: '2024-06-01',
-  },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -293,7 +262,7 @@ function ConfirmDeleteDialog({ user, onConfirm, onClose }: {
 
 export function TeamPage() {
   const { tenant } = useTenant()
-  const [users, setUsers] = useState<TeamUser[]>(MOCK_USERS)
+  const [users, setUsers] = useState<TeamUser[]>([])
   const [dialogTarget, setDialogTarget] = useState<TeamUser | null | 'new'>(null)
   const [deleteTarget, setDeleteTarget] = useState<TeamUser | null>(null)
 

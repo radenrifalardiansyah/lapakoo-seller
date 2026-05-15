@@ -9,7 +9,7 @@ import { SellerSidebar } from "./components/seller-sidebar";
 import { DashboardOverview } from "./components/dashboard-overview";
 import { ProductManagement } from "./components/product-management";
 import { WarehouseManagement } from "./components/warehouse-management";
-import { OrderManagement, initialOrders } from "./components/order-management";
+import { OrderManagement } from "./components/order-management";
 import { AnalyticsDashboard } from "./components/analytics-dashboard";
 import { AIInsightsPage } from "./components/ai-insights-page";
 import { CustomersPage } from "./components/customers-page";
@@ -17,8 +17,9 @@ import { PaymentsPage } from "./components/payments-page";
 import { LoginPage } from "./components/login-page";
 import { ForgotPasswordPage } from "./components/forgot-password-page";
 import { SettingsPage } from "./components/settings-page";
-import { ResellerPage, initialResellers } from "./components/reseller-page";
-import { MarketingPage, initialVouchers } from "./components/marketing-page";
+import { ResellerPage } from "./components/reseller-page";
+import { MarketingPage } from "./components/marketing-page";
+import { ordersApi, resellersApi, vouchersApi } from "./lib/api";
 import { HelpPage } from "./components/help-page";
 import { TeamPage } from "./components/team-page";
 import { LiveChat } from "./components/live-chat";
@@ -124,6 +125,9 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [orderBadgeCount, setOrderBadgeCount] = useState(0);
+  const [resellerBadgeCount, setResellerBadgeCount] = useState(0);
+  const [marketingBadgeCount, setMarketingBadgeCount] = useState(0);
 
   // Sinkronisasi tenant dengan sesi login — fetch store data setelah user login
   useEffect(() => {
@@ -133,6 +137,27 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
       resetTenant();
     }
   }, [token, refreshTenant, resetTenant]);
+
+  useEffect(() => {
+    if (!user) return
+    ordersApi.list().then(orders => {
+      setOrderBadgeCount(orders.filter(o => o.status === 'pending').length)
+    }).catch(() => {})
+    resellersApi.list().then(resellers => {
+      setResellerBadgeCount(resellers.filter(r => r.status === 'pending').length)
+    }).catch(() => {})
+    const now = new Date()
+    vouchersApi.list().then(vouchers => {
+      setMarketingBadgeCount(vouchers.filter(v => {
+        const isActive = v.is_active !== false && v.status !== 'inactive' && v.status !== 'disabled'
+        const end = new Date((v.end_date ?? v.expired_at ?? '') + 'T23:59:59')
+        const start = new Date(v.start_date ?? '')
+        const used = Number(v.used ?? v.used_count) || 0
+        const quota = Number(v.quota) || 0
+        return isActive && end > now && start <= now && used < quota
+      }).length)
+    }).catch(() => {})
+  }, [user])
 
   const goToOrders = () => {
     setActiveTab("orders");
@@ -212,12 +237,9 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
   const productBadge   = hasFeature('low-stock-alerts')
     ? products.filter(p => totalStockOf(p.id) <= 5).length
     : 0;
-  const orderBadge     = initialOrders.filter(o => o.status === 'pending').length;
-  const resellerBadge  = initialResellers.filter(r => r.status === 'pending').length;
-  const marketingBadge = initialVouchers.filter(v => {
-    const now = new Date();
-    return !v.disabled && new Date(v.endDate + 'T23:59:59') > now && new Date(v.startDate) <= now && v.used < v.quota;
-  }).length;
+  const orderBadge     = orderBadgeCount;
+  const resellerBadge  = resellerBadgeCount;
+  const marketingBadge = marketingBadgeCount;
 
   const primaryColor = tenant?.primaryColor ?? '#6366f1';
 

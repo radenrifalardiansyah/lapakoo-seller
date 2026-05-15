@@ -1,56 +1,17 @@
+import { useState, useEffect } from 'react'
 import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Separator } from "./ui/separator"
+import { Skeleton } from "./ui/skeleton"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Tooltip,
 } from 'recharts'
 import { TrendingUp, TrendingDown, ShoppingCart, Package, DollarSign, Users } from 'lucide-react'
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const salesTrendData = [
-  { date: '01 Jan', penjualan: 12000000, pesanan: 45, pengunjung: 1250 },
-  { date: '02 Jan', penjualan: 15000000, pesanan: 52, pengunjung: 1380 },
-  { date: '03 Jan', penjualan: 18000000, pesanan: 61, pengunjung: 1520 },
-  { date: '04 Jan', penjualan: 14000000, pesanan: 48, pengunjung: 1290 },
-  { date: '05 Jan', penjualan: 22000000, pesanan: 75, pengunjung: 1680 },
-  { date: '06 Jan', penjualan: 19000000, pesanan: 66, pengunjung: 1590 },
-  { date: '07 Jan', penjualan: 25000000, pesanan: 82, pengunjung: 1890 },
-]
-
-const monthlyData = [
-  { bulan: 'Jan', penjualan: 125000000, pesanan: 450, pelanggan: 380 },
-  { bulan: 'Feb', penjualan: 132000000, pesanan: 478, pelanggan: 425 },
-  { bulan: 'Mar', penjualan: 148000000, pesanan: 520, pelanggan: 465 },
-  { bulan: 'Apr', penjualan: 155000000, pesanan: 545, pelanggan: 490 },
-  { bulan: 'Mei', penjualan: 178000000, pesanan: 612, pelanggan: 550 },
-  { bulan: 'Jun', penjualan: 185000000, pesanan: 645, pelanggan: 580 },
-]
-
-const topProductsData = [
-  { nama: 'iPhone 14 Pro', penjualan: 45000000, pesanan: 30, persentase: 35 },
-  { nama: 'Samsung Galaxy S23', penjualan: 38000000, pesanan: 25, persentase: 28 },
-  { nama: 'MacBook Air M2', penjualan: 32000000, pesanan: 18, persentase: 22 },
-  { nama: 'iPad Air', penjualan: 15000000, pesanan: 12, persentase: 15 },
-]
-
-const trafficSourceData = [
-  { sumber: 'Organic Search', pengunjung: 45, color: '#8884d8' },
-  { sumber: 'Media Sosial',   pengunjung: 25, color: '#82ca9d' },
-  { sumber: 'Direct',         pengunjung: 15, color: '#ffc658' },
-  { sumber: 'Referral',       pengunjung: 10, color: '#ff7300' },
-  { sumber: 'Email',          pengunjung: 5,  color: '#06b6d4' },
-]
-
-const customerSegmentData = [
-  { segmen: 'Pelanggan Baru',     jumlah: 500, persentase: 40, rataRata: 850000,  color: '#22c55e' },
-  { segmen: 'Pelanggan Regular',  jumlah: 658, persentase: 53, rataRata: 2100000, color: '#3b82f6' },
-  { segmen: 'Pelanggan VIP',      jumlah: 89,  persentase: 7,  rataRata: 8500000, color: '#f59e0b' },
-]
+import { storeApi, ordersApi, customersApi, type ApiStoreStats, type ApiOrder, type ApiCustomer } from '../lib/api'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +25,17 @@ function formatShort(v: number) {
   return `Rp ${v}`
 }
 
-const CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#06b6d4']
+function pctChange(cur: number, prev: number) {
+  if (prev === 0) return null
+  return ((cur - prev) / prev) * 100
+}
+
+function formatPct(n: number | null): { label: string; up: boolean } | null {
+  if (n === null) return null
+  return { label: `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`, up: n >= 0 }
+}
+
+const CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#06b6d4', '#f43f5e', '#8b5cf6']
 
 // ─── Custom Tooltip ───────────────────────────────────────────────────────────
 
@@ -96,22 +67,111 @@ function CountTooltip({ active, payload, label }: any) {
   )
 }
 
+// ─── Empty State ─────────────────────────────────────────────────────────────
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+      {message}
+    </div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard() {
+  const [stats, setStats] = useState<ApiStoreStats | null>(null)
+  const [orders, setOrders] = useState<ApiOrder[]>([])
+  const [customers, setCustomers] = useState<ApiCustomer[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      storeApi.stats(),
+      ordersApi.list(),
+      customersApi.list(),
+    ])
+      .then(([s, o, c]) => { setStats(s); setOrders(o); setCustomers(c) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  // ── Compute KPIs ──
+  const totalRevenue = Number(stats?.total_revenue ?? 0)
+  const totalOrders = Number(stats?.total_orders ?? 0)
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+  // ── Monthly chart from stats.sales_chart ──
+  const monthlyData = stats?.sales_chart?.map(d => ({
+    bulan: d.month, penjualan: d.sales, pesanan: d.orders,
+  })) ?? []
+
+  // ── Category distribution from stats.category_chart ──
+  const categoryData = stats?.category_chart?.map((d, i) => ({
+    sumber: d.name, pengunjung: d.value, color: CHART_COLORS[i % CHART_COLORS.length],
+  })) ?? []
+
+  // ── Top products from delivered orders ──
+  const productMap = new Map<string, { penjualan: number; pesanan: number }>()
+  for (const order of orders) {
+    if (order.status !== 'delivered') continue
+    const items = order.items ?? order.order_items ?? []
+    for (const item of items) {
+      const name = item.product_name ?? item.name ?? 'Produk'
+      const qty = Number(item.qty ?? item.quantity) || 1
+      const price = Number(item.subtotal) || Number(item.unit_price ?? item.price ?? 0) * qty
+      const existing = productMap.get(name) ?? { penjualan: 0, pesanan: 0 }
+      productMap.set(name, { penjualan: existing.penjualan + price, pesanan: existing.pesanan + qty })
+    }
+  }
+  const totalProductSales = Array.from(productMap.values()).reduce((s, p) => s + p.penjualan, 0)
+  const topProductsData = Array.from(productMap.entries())
+    .sort((a, b) => b[1].penjualan - a[1].penjualan)
+    .slice(0, 5)
+    .map(([nama, d]) => ({
+      nama,
+      penjualan: d.penjualan,
+      pesanan: d.pesanan,
+      persentase: totalProductSales > 0 ? Math.round((d.penjualan / totalProductSales) * 100) : 0,
+    }))
+
+  // ── Customer segments ──
+  const segNew     = customers.filter(c => Number(c.total_orders ?? 0) <= 1)
+  const segRegular = customers.filter(c => { const n = Number(c.total_orders ?? 0); return n >= 2 && n <= 5 })
+  const segVip     = customers.filter(c => Number(c.total_orders ?? 0) > 5)
+  const totalCust  = customers.length || 1
+  const avgSpend   = (cs: ApiCustomer[]) => cs.length ? cs.reduce((s, c) => s + (Number(c.total_spend) || 0), 0) / cs.length : 0
+
+  const customerSegmentData = [
+    { segmen: 'Pelanggan Baru',    jumlah: segNew.length,     persentase: Math.round((segNew.length / totalCust) * 100),     rataRata: avgSpend(segNew),     color: '#22c55e' },
+    { segmen: 'Pelanggan Regular', jumlah: segRegular.length, persentase: Math.round((segRegular.length / totalCust) * 100), rataRata: avgSpend(segRegular), color: '#3b82f6' },
+    { segmen: 'Pelanggan VIP',     jumlah: segVip.length,     persentase: Math.round((segVip.length / totalCust) * 100),     rataRata: avgSpend(segVip),     color: '#f59e0b' },
+  ]
+
+  // ── Month-over-month growth from sales_chart ──
+  const lastTwo = monthlyData.slice(-2)
+  const growthRevenue  = lastTwo.length >= 2 ? formatPct(pctChange(lastTwo[1].penjualan, lastTwo[0].penjualan)) : null
+  const growthOrders   = lastTwo.length >= 2 ? formatPct(pctChange(lastTwo[1].pesanan,   lastTwo[0].pesanan))   : null
+  const growthCustomers = null // belum ada data pelanggan bulanan dari API
+
+  const prevAvg = lastTwo.length >= 2 && lastTwo[0].pesanan > 0 ? lastTwo[0].penjualan / lastTwo[0].pesanan : 0
+  const curAvg  = lastTwo.length >= 2 && lastTwo[1].pesanan > 0 ? lastTwo[1].penjualan / lastTwo[1].pesanan : 0
+  const growthAov = prevAvg > 0 ? formatPct(pctChange(curAvg, prevAvg)) : null
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Analitik & Laporan</h1>
+          <h1 className="text-2xl font-bold">Analitik &amp; Laporan</h1>
           <p className="text-muted-foreground">Pantau performa bisnis dan dapatkan insights untuk mengembangkan toko Anda</p>
         </div>
-        <Select defaultValue="7days">
+        <Select defaultValue="all">
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Pilih periode" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">Semua Waktu</SelectItem>
             <SelectItem value="7days">7 Hari Terakhir</SelectItem>
             <SelectItem value="30days">30 Hari Terakhir</SelectItem>
             <SelectItem value="3months">3 Bulan Terakhir</SelectItem>
@@ -122,29 +182,41 @@ export function AnalyticsDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { title: 'Total Pendapatan',         value: formatPrice(125000000), trend: '+15.2%', up: true,  icon: DollarSign,   color: 'text-green-500' },
-          { title: 'Tingkat Konversi',          value: '4.35%',                trend: '+0.8%',  up: true,  icon: ShoppingCart, color: 'text-blue-500' },
-          { title: 'Rata-rata Nilai Pesanan',   value: formatPrice(875000),    trend: '-2.1%',  up: false, icon: Package,      color: 'text-orange-500' },
-          { title: 'Pelanggan Baru',            value: '156',                  trend: '+22%',   up: true,  icon: Users,        color: 'text-purple-500' },
-        ].map((item, i) => {
-          const Icon = item.icon
-          return (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                <Icon className={`h-4 w-4 ${item.color}`} />
-              </CardHeader>
-              <CardContent>
-                <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
-                <p className={`text-xs flex items-center justify-end gap-1 mt-1 tabular-nums ${item.up ? 'text-green-600' : 'text-red-500'}`}>
-                  {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {item.trend} dari periode sebelumnya
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
+        {loading
+          ? [...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2"><Skeleton className="h-4 w-28" /></CardHeader>
+                <CardContent><Skeleton className="h-8 w-36 ml-auto" /></CardContent>
+              </Card>
+            ))
+          : ([
+              { title: 'Total Pendapatan',       value: formatPrice(totalRevenue),                  trend: growthRevenue,  icon: DollarSign,   color: 'text-green-500' },
+              { title: 'Total Pesanan',           value: totalOrders.toLocaleString('id-ID'),         trend: growthOrders,   icon: ShoppingCart, color: 'text-blue-500' },
+              { title: 'Rata-rata Nilai Pesanan', value: formatPrice(avgOrderValue),                  trend: growthAov,      icon: Package,      color: 'text-orange-500' },
+              { title: 'Total Pelanggan',         value: customers.length.toLocaleString('id-ID'),    trend: growthCustomers,icon: Users,        color: 'text-purple-500' },
+            ] as const).map((item, i) => {
+              const Icon = item.icon
+              return (
+                <Card key={i}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+                    <Icon className={`h-4 w-4 ${item.color}`} />
+                  </CardHeader>
+                  <CardContent>
+                    <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{item.value}</TruncatedText>
+                    {item.trend ? (
+                      <p className={`text-xs flex items-center justify-end gap-1 mt-1 tabular-nums ${item.trend.up ? 'text-green-600' : 'text-red-500'}`}>
+                        {item.trend.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {item.trend.label} dari bulan lalu
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1 text-right">—</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })
+        }
       </div>
 
       {/* Tabs */}
@@ -155,30 +227,35 @@ export function AnalyticsDashboard() {
             <TabsTrigger value="sales">Penjualan</TabsTrigger>
             <TabsTrigger value="products">Produk</TabsTrigger>
             <TabsTrigger value="customers">Pelanggan</TabsTrigger>
-            <TabsTrigger value="traffic">Sumber Traffic</TabsTrigger>
           </TabsList>
         </div>
 
         {/* ── Ringkasan ── */}
         <TabsContent value="overview" className="space-y-6 mt-4">
           <Card>
-            <CardHeader><CardTitle>Tren Penjualan Harian</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Tren Penjualan Bulanan</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={salesTrendData}>
-                  <defs>
-                    <linearGradient id="gradSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#8884d8" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={formatShort} width={75} />
-                  <Tooltip content={<PriceTooltip />} />
-                  <Area type="monotone" dataKey="penjualan" name="Penjualan" stroke="#8884d8" fill="url(#gradSales)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <Skeleton className="h-[320px] w-full" />
+              ) : monthlyData.length === 0 ? (
+                <EmptyState message="Belum ada data penjualan" />
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={monthlyData}>
+                    <defs>
+                      <linearGradient id="gradSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#8884d8" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="bulan" />
+                    <YAxis tickFormatter={formatShort} width={75} />
+                    <Tooltip content={<PriceTooltip />} />
+                    <Area type="monotone" dataKey="penjualan" name="Penjualan" stroke="#8884d8" fill="url(#gradSales)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -186,46 +263,60 @@ export function AnalyticsDashboard() {
             <Card>
               <CardHeader><CardTitle>Produk Terlaris</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {topProductsData.map((p, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1 gap-3">
-                      <div className="min-w-0">
-                        <TruncatedText className="text-sm font-medium truncate">{p.nama}</TruncatedText>
-                        <p className="text-xs text-muted-foreground tabular-nums">{p.pesanan} pesanan</p>
+                {loading ? (
+                  [...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+                ) : topProductsData.length === 0 ? (
+                  <EmptyState message="Belum ada data produk terlaris" />
+                ) : (
+                  topProductsData.map((p, i) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-1 gap-3">
+                        <div className="min-w-0">
+                          <TruncatedText className="text-sm font-medium truncate">{p.nama}</TruncatedText>
+                          <p className="text-xs text-muted-foreground tabular-nums">{p.pesanan} terjual</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold tabular-nums">{formatPrice(p.penjualan)}</p>
+                          <Badge variant="secondary" className="text-xs tabular-nums">{p.persentase}%</Badge>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold tabular-nums">{formatPrice(p.penjualan)}</p>
-                        <Badge variant="secondary" className="text-xs tabular-nums">{p.persentase}%</Badge>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div className="bg-primary h-1.5 rounded-full" style={{ width: `${p.persentase}%` }} />
                       </div>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-1.5">
-                      <div className="bg-primary h-1.5 rounded-full" style={{ width: `${p.persentase}%` }} />
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Sumber Traffic</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Distribusi Kategori Produk</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={trafficSourceData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="pengunjung">
-                      {trafficSourceData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [`${v}%`, 'Pengunjung']} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
-                  {trafficSourceData.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <TruncatedText as="span" className="text-muted-foreground truncate">{item.sumber}</TruncatedText>
-                      <span className="ml-auto font-medium">{item.pengunjung}%</span>
+                {loading ? (
+                  <Skeleton className="h-[180px] w-full" />
+                ) : categoryData.length === 0 ? (
+                  <EmptyState message="Belum ada data kategori" />
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="pengunjung">
+                          {categoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [`${v}%`, 'Porsi']} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                      {categoryData.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                          <TruncatedText as="span" className="text-muted-foreground truncate">{item.sumber}</TruncatedText>
+                          <span className="ml-auto font-medium">{item.pengunjung}%</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -236,59 +327,49 @@ export function AnalyticsDashboard() {
           <Card>
             <CardHeader><CardTitle>Penjualan Bulanan</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="bulan" />
-                  <YAxis tickFormatter={formatShort} width={75} />
-                  <Tooltip content={<PriceTooltip />} />
-                  <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <Skeleton className="h-[320px] w-full" />
+              ) : monthlyData.length === 0 ? (
+                <EmptyState message="Belum ada data penjualan bulanan" />
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="bulan" />
+                    <YAxis tickFormatter={formatShort} width={75} />
+                    <Tooltip content={<PriceTooltip />} />
+                    <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Pertumbuhan</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { label: 'Pertumbuhan Pendapatan', value: '+15.2%', up: true },
-                  { label: 'Pertumbuhan Pesanan',    value: '+12.8%', up: true },
-                  { label: 'Pertumbuhan Pelanggan',  value: '+22.3%', up: true },
-                  { label: 'Pertumbuhan AOV',        value: '-2.1%',  up: false },
+          <Card>
+            <CardHeader><CardTitle>Pertumbuhan Bulan-ke-Bulan</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? (
+                [...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
+              ) : (
+                [
+                  { label: 'Pertumbuhan Pendapatan', trend: growthRevenue },
+                  { label: 'Pertumbuhan Pesanan',    trend: growthOrders },
+                  { label: 'Pertumbuhan AOV',        trend: growthAov },
                 ].map((item, i) => (
                   <div key={i} className="flex justify-between items-center py-1">
                     <span className="text-sm">{item.label}</span>
-                    <Badge className={item.up ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-red-100 text-red-700 hover:bg-red-100'}>
-                      {item.value}
-                    </Badge>
+                    {item.trend ? (
+                      <Badge className={item.trend.up ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-red-100 text-red-700 hover:bg-red-100'}>
+                        {item.trend.label}
+                      </Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Data tidak cukup</span>
+                    )}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Pencapaian Target</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { label: 'Target Pendapatan Bulanan', pct: 85, color: 'bg-blue-500' },
-                  { label: 'Target Jumlah Pesanan',     pct: 92, color: 'bg-green-500' },
-                  { label: 'Target Pelanggan Baru',     pct: 78, color: 'bg-orange-500' },
-                ].map((item, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm">{item.label}</span>
-                      <span className="text-sm font-medium">{item.pct}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className={`${item.color} h-2 rounded-full transition-all`} style={{ width: `${item.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── Produk ── */}
@@ -296,161 +377,51 @@ export function AnalyticsDashboard() {
           <Card>
             <CardHeader><CardTitle>Pendapatan per Produk</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={topProductsData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={formatShort} width={70} />
-                  <YAxis type="category" dataKey="nama" width={140} tick={{ fontSize: 12 }} />
-                  <Tooltip content={<PriceTooltip />} />
-                  <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Detail Produk Terlaris</CardTitle></CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium text-muted-foreground">#</th>
-                    <th className="text-left py-2 font-medium text-muted-foreground">Produk</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Pesanan</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Pendapatan</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Kontribusi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topProductsData.map((p, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-3 text-muted-foreground tabular-nums">{i + 1}</td>
-                      <td className="py-3 font-medium">{p.nama}</td>
-                      <td className="py-3 text-right tabular-nums">{p.pesanan}</td>
-                      <td className="py-3 text-right tabular-nums">{formatPrice(p.penjualan)}</td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 bg-muted rounded-full h-1.5">
-                            <div className="bg-primary h-1.5 rounded-full" style={{ width: `${p.persentase}%` }} />
-                          </div>
-                          <span className="tabular-nums">{p.persentase}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Pelanggan ── */}
-        <TabsContent value="customers" className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {customerSegmentData.map((seg, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">{seg.segmen}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{seg.jumlah.toLocaleString('id-ID')}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{seg.persentase}% dari total</p>
-                  <Separator className="my-2" />
-                  <p className="text-xs text-muted-foreground">Rata-rata belanja</p>
-                  <p className="text-sm font-semibold">{formatPrice(seg.rataRata)}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Segmentasi Pelanggan</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={customerSegmentData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="jumlah">
-                      {customerSegmentData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [v.toLocaleString('id-ID'), 'Pelanggan']} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2 mt-2">
-                  {customerSegmentData.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="flex-1">{item.segmen}</span>
-                      <span className="font-medium">{item.jumlah}</span>
-                      <span className="text-muted-foreground">({item.persentase}%)</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Pertumbuhan Pelanggan Bulanan</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={monthlyData}>
+              {loading ? (
+                <Skeleton className="h-[280px] w-full" />
+              ) : topProductsData.length === 0 ? (
+                <EmptyState message="Belum ada data produk" />
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(180, topProductsData.length * 55)}>
+                  <BarChart data={topProductsData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bulan" />
-                    <YAxis />
-                    <Tooltip content={<CountTooltip />} />
-                    <Line type="monotone" dataKey="pelanggan" name="Pelanggan" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} />
-                  </LineChart>
+                    <XAxis type="number" tickFormatter={formatShort} width={70} />
+                    <YAxis type="category" dataKey="nama" width={140} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<PriceTooltip />} />
+                    <Bar dataKey="penjualan" name="Penjualan" fill="#8884d8" radius={[0, 4, 4, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* ── Traffic ── */}
-        <TabsContent value="traffic" className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {topProductsData.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Distribusi Sumber Traffic</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie data={trafficSourceData} cx="50%" cy="50%" outerRadius={100} paddingAngle={3} dataKey="pengunjung" label={({ sumber, pengunjung }) => `${pengunjung}%`}>
-                      {trafficSourceData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [`${v}%`, 'Persentase']} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Detail Sumber Traffic</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Detail Produk Terlaris</CardTitle></CardHeader>
               <CardContent>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-2 font-medium text-muted-foreground">Sumber</th>
-                      <th className="text-right py-2 font-medium text-muted-foreground">Pengunjung</th>
-                      <th className="text-right py-2 font-medium text-muted-foreground">Persentase</th>
+                      <th className="text-left py-2 font-medium text-muted-foreground">#</th>
+                      <th className="text-left py-2 font-medium text-muted-foreground">Produk</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Terjual</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Pendapatan</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Kontribusi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trafficSourceData.map((item, i) => (
+                    {topProductsData.map((p, i) => (
                       <tr key={i} className="border-b last:border-0">
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                            {item.sumber}
-                          </div>
-                        </td>
-                        <td className="py-3 text-right text-muted-foreground tabular-nums">
-                          {Math.round(item.pengunjung * 18.9).toLocaleString('id-ID')}
-                        </td>
+                        <td className="py-3 text-muted-foreground tabular-nums">{i + 1}</td>
+                        <td className="py-3 font-medium">{p.nama}</td>
+                        <td className="py-3 text-right tabular-nums">{p.pesanan}</td>
+                        <td className="py-3 text-right tabular-nums">{formatPrice(p.penjualan)}</td>
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-16 bg-muted rounded-full h-1.5">
-                              <div className="h-1.5 rounded-full" style={{ width: `${item.pengunjung}%`, backgroundColor: item.color }} />
+                              <div className="bg-primary h-1.5 rounded-full" style={{ width: `${p.persentase}%` }} />
                             </div>
-                            <span className="tabular-nums">{item.pengunjung}%</span>
+                            <span className="tabular-nums">{p.persentase}%</span>
                           </div>
                         </td>
                       </tr>
@@ -459,28 +430,92 @@ export function AnalyticsDashboard() {
                 </table>
               </CardContent>
             </Card>
-          </div>
+          )}
+        </TabsContent>
 
-          <Card>
-            <CardHeader><CardTitle>Tren Pengunjung Harian</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={salesTrendData}>
-                  <defs>
-                    <linearGradient id="gradVisitors" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#82ca9d" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#82ca9d" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip content={<CountTooltip />} />
-                  <Area type="monotone" dataKey="pengunjung" name="Pengunjung" stroke="#82ca9d" fill="url(#gradVisitors)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        {/* ── Pelanggan ── */}
+        <TabsContent value="customers" className="space-y-6 mt-4">
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {customerSegmentData.map((seg, i) => (
+                <Card key={i}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">{seg.segmen}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{seg.jumlah.toLocaleString('id-ID')}</div>
+                    <p className="text-xs text-muted-foreground mt-1">{seg.persentase}% dari total</p>
+                    {seg.rataRata > 0 && (
+                      <>
+                        <Separator className="my-2" />
+                        <p className="text-xs text-muted-foreground">Rata-rata belanja</p>
+                        <p className="text-sm font-semibold">{formatPrice(seg.rataRata)}</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Segmentasi Pelanggan</CardTitle></CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-[220px] w-full" />
+                ) : customers.length === 0 ? (
+                  <EmptyState message="Belum ada data pelanggan" />
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie data={customerSegmentData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="jumlah">
+                          {customerSegmentData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [v.toLocaleString('id-ID'), 'Pelanggan']} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2 mt-2">
+                      {customerSegmentData.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                          <span className="flex-1">{item.segmen}</span>
+                          <span className="font-medium">{item.jumlah}</span>
+                          <span className="text-muted-foreground">({item.persentase}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Pertumbuhan Pesanan Bulanan</CardTitle></CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-[220px] w-full" />
+                ) : monthlyData.length === 0 ? (
+                  <EmptyState message="Belum ada data pesanan bulanan" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bulan" />
+                      <YAxis />
+                      <Tooltip content={<CountTooltip />} />
+                      <Line type="monotone" dataKey="pesanan" name="Pesanan" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

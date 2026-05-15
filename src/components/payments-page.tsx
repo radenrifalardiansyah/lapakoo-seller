@@ -60,106 +60,69 @@ interface ReportSummary {
   orders: number
 }
 
-// ─── Income Report Data ───────────────────────────────────────────────────────
+// ─── Income Report Helpers ────────────────────────────────────────────────────
 
-const ADMIN_RATE = 0.02   // 2% biaya layanan platform
+const ADMIN_RATE = 0.02
 
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 const MONTH_NAMES  = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
-const BASE_MONTHLY: Record<number, { omzet: number; refund: number; orders: number }[]> = {
-  2024: [
-    { omzet: 125_000_000, refund: 3_500_000, orders: 28 },
-    { omzet: 132_000_000, refund: 2_800_000, orders: 30 },
-    { omzet: 148_000_000, refund: 4_100_000, orders: 35 },
-    { omzet: 155_000_000, refund: 3_200_000, orders: 37 },
-    { omzet: 178_000_000, refund: 5_000_000, orders: 42 },
-    { omzet: 185_000_000, refund: 4_500_000, orders: 44 },
-    { omzet: 162_000_000, refund: 3_800_000, orders: 39 },
-    { omzet: 195_000_000, refund: 5_500_000, orders: 46 },
-    { omzet: 208_000_000, refund: 4_200_000, orders: 49 },
-    { omzet: 220_000_000, refund: 6_000_000, orders: 52 },
-    { omzet: 245_000_000, refund: 7_000_000, orders: 58 },
-    { omzet: 278_000_000, refund: 8_500_000, orders: 65 },
-  ],
-  2023: [
-    { omzet: 87_000_000,  refund: 2_000_000, orders: 20 },
-    { omzet: 92_000_000,  refund: 1_800_000, orders: 21 },
-    { omzet: 98_000_000,  refund: 2_500_000, orders: 23 },
-    { omzet: 105_000_000, refund: 2_200_000, orders: 25 },
-    { omzet: 118_000_000, refund: 3_000_000, orders: 28 },
-    { omzet: 125_000_000, refund: 2_800_000, orders: 30 },
-    { omzet: 110_000_000, refund: 2_500_000, orders: 26 },
-    { omzet: 130_000_000, refund: 3_200_000, orders: 31 },
-    { omzet: 142_000_000, refund: 3_500_000, orders: 34 },
-    { omzet: 155_000_000, refund: 4_000_000, orders: 37 },
-    { omzet: 168_000_000, refund: 4_500_000, orders: 40 },
-    { omzet: 192_000_000, refund: 5_500_000, orders: 46 },
-  ],
-  2022: [
-    { omzet: 62_000_000,  refund: 1_200_000, orders: 14 },
-    { omzet: 68_000_000,  refund: 1_500_000, orders: 16 },
-    { omzet: 75_000_000,  refund: 1_800_000, orders: 18 },
-    { omzet: 80_000_000,  refund: 2_000_000, orders: 19 },
-    { omzet: 88_000_000,  refund: 2_200_000, orders: 21 },
-    { omzet: 95_000_000,  refund: 2_500_000, orders: 23 },
-    { omzet: 85_000_000,  refund: 2_000_000, orders: 20 },
-    { omzet: 102_000_000, refund: 2_800_000, orders: 24 },
-    { omzet: 110_000_000, refund: 3_000_000, orders: 26 },
-    { omzet: 118_000_000, refund: 3_200_000, orders: 28 },
-    { omzet: 132_000_000, refund: 3_800_000, orders: 31 },
-    { omzet: 155_000_000, refund: 4_500_000, orders: 37 },
-  ],
+type OrderBucket = { omzet: number; refund: number; orders: number }
+
+function buildOrderBuckets(orders: ApiOrder[]) {
+  const byYearMonthDay: Record<number, Record<number, Record<number, OrderBucket>>> = {}
+  for (const order of orders) {
+    const raw = order.created_at ?? order.order_date ?? ''
+    const d = new Date(raw)
+    if (isNaN(d.getTime())) continue
+    const y = d.getFullYear()
+    const m = d.getMonth() + 1
+    const day = d.getDate()
+    if (!byYearMonthDay[y]) byYearMonthDay[y] = {}
+    if (!byYearMonthDay[y][m]) byYearMonthDay[y][m] = {}
+    if (!byYearMonthDay[y][m][day]) byYearMonthDay[y][m][day] = { omzet: 0, refund: 0, orders: 0 }
+    const amount = Number(order.total_amount ?? order.total) || 0
+    if (order.status === 'delivered') {
+      byYearMonthDay[y][m][day].omzet += amount
+      byYearMonthDay[y][m][day].orders += 1
+    }
+    if (order.status === 'cancelled' && order.payment_status === 'paid') {
+      byYearMonthDay[y][m][day].refund += amount
+    }
+  }
+  return byYearMonthDay
 }
 
-// Deterministic daily weight distribution (31 values)
-const DAY_WEIGHTS = [
-  0.65, 0.85, 1.10, 0.75, 1.05, 1.25, 0.55, 0.80, 1.15, 0.90,
-  1.10, 0.70, 1.00, 1.20, 0.78, 0.88, 1.12, 0.72, 1.28, 0.82,
-  1.02, 0.92, 1.08, 0.78, 0.68, 1.18, 0.88, 1.00, 0.80, 1.10, 0.90,
-]
-
-function getYearlyReport(year: number): ReportRow[] {
-  const base = BASE_MONTHLY[year]
-  if (!base) return []
-  return base.map((m, i) => {
-    const adminFee = Math.round(m.omzet * ADMIN_RATE)
-    const netIncome = m.omzet - adminFee - m.refund
+function getYearlyReport(buckets: Record<number, Record<number, Record<number, OrderBucket>>>, year: number): ReportRow[] {
+  return MONTH_LABELS.map((label, i) => {
+    const m = i + 1
+    const dayBuckets = buckets[year]?.[m] ?? {}
+    const omzet = Object.values(dayBuckets).reduce((s, b) => s + b.omzet, 0)
+    const refund = Object.values(dayBuckets).reduce((s, b) => s + b.refund, 0)
+    const orders = Object.values(dayBuckets).reduce((s, b) => s + b.orders, 0)
+    const adminFee = Math.round(omzet * ADMIN_RATE)
     return {
-      period: MONTH_LABELS[i],
-      date: `${year}-${String(i + 1).padStart(2, '0')}-01`,
-      omzet: m.omzet,
-      adminFee,
-      refund: m.refund,
-      netIncome,
-      orders: m.orders,
+      period: label,
+      date: `${year}-${String(m).padStart(2, '0')}-01`,
+      omzet, adminFee, refund,
+      netIncome: omzet - adminFee - refund,
+      orders,
     }
   })
 }
 
-function getMonthlyReport(year: number, month: number): ReportRow[] {
-  const base = BASE_MONTHLY[year]?.[month - 1]
-  if (!base) return []
+function getMonthlyReport(buckets: Record<number, Record<number, Record<number, OrderBucket>>>, year: number, month: number): ReportRow[] {
   const daysInMonth = new Date(year, month, 0).getDate()
-  const weights = DAY_WEIGHTS.slice(0, daysInMonth)
-  const totalWeight = weights.reduce((s, w) => s + w, 0)
-  return weights.map((w, i) => {
+  return Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1
-    const omzet = Math.round((base.omzet * w) / totalWeight)
-    const adminFee = Math.round(omzet * ADMIN_RATE)
-    const refund = (i % 7 === 0 || i % 11 === 3)
-      ? Math.round(base.refund / Math.max(1, Math.floor(daysInMonth / 5)))
-      : 0
-    const netIncome = omzet - adminFee - refund
-    const orders = Math.max(1, Math.round((base.orders * w) / totalWeight))
+    const b = buckets[year]?.[month]?.[day] ?? { omzet: 0, refund: 0, orders: 0 }
+    const adminFee = Math.round(b.omzet * ADMIN_RATE)
     return {
-      period: `${day}`,
+      period: String(day),
       date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-      omzet,
-      adminFee,
-      refund,
-      netIncome,
-      orders,
+      omzet: b.omzet, adminFee, refund: b.refund,
+      netIncome: b.omzet - adminFee - b.refund,
+      orders: b.orders,
     }
   })
 }
@@ -177,11 +140,14 @@ function computeSummary(rows: ReportRow[]): ReportSummary {
   )
 }
 
-function getPrevSummary(mode: ReportMode, year: number, month: number): ReportSummary {
-  if (mode === 'yearly') return computeSummary(getYearlyReport(year - 1))
+function getPrevSummary(
+  buckets: Record<number, Record<number, Record<number, OrderBucket>>>,
+  mode: ReportMode, year: number, month: number,
+): ReportSummary {
+  if (mode === 'yearly') return computeSummary(getYearlyReport(buckets, year - 1))
   const pm = month === 1 ? 12 : month - 1
   const py = month === 1 ? year - 1 : year
-  return computeSummary(getMonthlyReport(py, pm))
+  return computeSummary(getMonthlyReport(buckets, py, pm))
 }
 
 function pctChange(cur: number, prev: number) {
@@ -189,28 +155,36 @@ function pctChange(cur: number, prev: number) {
   return ((cur - prev) / prev) * 100
 }
 
-// ─── Mock Transactions ────────────────────────────────────────────────────────
-
-const mockTransactions: Transaction[] = [
-  { id: 'TRX-001', date: '2024-01-15', description: 'Penjualan iPhone 14 Pro Max',           type: 'Penjualan',   amount:  15999000, status: 'Sukses' },
-  { id: 'TRX-002', date: '2024-01-15', description: 'Penjualan Samsung Galaxy S23',           type: 'Penjualan',   amount:  18999000, status: 'Sukses' },
-  { id: 'TRX-003', date: '2024-01-15', description: 'Biaya Layanan Platform (Jan W3)',         type: 'Biaya Admin', amount:    -698000, status: 'Sukses' },
-  { id: 'TRX-004', date: '2024-01-14', description: 'Penarikan ke BCA - 1234****',            type: 'Penarikan',   amount: -20000000, status: 'Sukses' },
-  { id: 'TRX-005', date: '2024-01-14', description: 'Refund Pesanan ORD-005',                 type: 'Refund',      amount:  -8999000, status: 'Sukses' },
-  { id: 'TRX-006', date: '2024-01-13', description: 'Penjualan MacBook Air M2',               type: 'Penjualan',   amount:  18999000, status: 'Sukses' },
-  { id: 'TRX-007', date: '2024-01-13', description: 'Penjualan Nike Air Jordan 1',            type: 'Penjualan',   amount:   4998000, status: 'Sukses' },
-  { id: 'TRX-008', date: '2024-01-12', description: 'Biaya Layanan Platform (Jan W2)',         type: 'Biaya Admin', amount:    -480000, status: 'Sukses' },
-  { id: 'TRX-009', date: '2024-01-12', description: 'Penarikan ke Mandiri - 5678****',        type: 'Penarikan',   amount: -15000000, status: 'Pending' },
-  { id: 'TRX-010', date: '2024-01-12', description: 'Penjualan Sony WH-1000XM5',              type: 'Penjualan',   amount:   5499000, status: 'Sukses' },
-  { id: 'TRX-011', date: '2024-01-11', description: 'Penjualan iPad Air 5th Gen',             type: 'Penjualan',   amount:   8999000, status: 'Sukses' },
-  { id: 'TRX-012', date: '2024-01-11', description: 'Refund Pesanan ORD-003',                 type: 'Refund',      amount:  -1299000, status: 'Sukses' },
-  { id: 'TRX-013', date: '2024-01-10', description: 'Penjualan Adidas Ultraboost',            type: 'Penjualan',   amount:   2899000, status: 'Sukses' },
-  { id: 'TRX-014', date: '2024-01-10', description: 'Penarikan ke GoPay - 0812****',          type: 'Penarikan',   amount:  -5000000, status: 'Gagal' },
-  { id: 'TRX-015', date: '2024-01-09', description: 'Penjualan Magic Mouse',                  type: 'Penjualan',   amount:   1299000, status: 'Sukses' },
-  { id: 'TRX-016', date: '2024-01-09', description: 'Penjualan Samsung Galaxy Buds2',         type: 'Penjualan',   amount:   3299000, status: 'Pending' },
-  { id: 'TRX-017', date: '2024-01-08', description: 'Biaya Layanan Platform (Jan W1)',         type: 'Biaya Admin', amount:    -320000, status: 'Sukses' },
-  { id: 'TRX-018', date: '2024-01-08', description: 'Penarikan ke BNI - 9012****',            type: 'Penarikan',   amount: -10000000, status: 'Sukses' },
-]
+function ordersToTransactions(orders: ApiOrder[]): Transaction[] {
+  const txs: Transaction[] = []
+  for (const order of orders) {
+    const date = (order.created_at ?? order.order_date ?? '').slice(0, 10)
+    const amount = Number(order.total_amount ?? order.total) || 0
+    const orderNum = String(order.order_number ?? order.id)
+    const isPaid = order.payment_status === 'paid' || order.status === 'delivered'
+    if (isPaid) {
+      txs.push({
+        id: orderNum,
+        date,
+        description: `Penjualan Pesanan ${orderNum}`,
+        type: 'Penjualan',
+        amount,
+        status: order.status === 'delivered' ? 'Sukses' : 'Pending',
+      })
+    }
+    if (order.status === 'cancelled' && order.payment_status === 'paid') {
+      txs.push({
+        id: `REF-${orderNum}`,
+        date,
+        description: `Refund Pesanan ${orderNum}`,
+        type: 'Refund',
+        amount: -amount,
+        status: 'Sukses',
+      })
+    }
+  }
+  return txs.sort((a, b) => b.date.localeCompare(a.date))
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -381,8 +355,6 @@ function WithdrawDialog({ open, onClose, balance }: { open: boolean; onClose: ()
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const AVAILABLE_YEARS = [2022, 2023, 2024]
-
 export function PaymentsPage() {
   const { hasFeature, tenant } = useTenant()
   // ── existing state ──
@@ -394,12 +366,12 @@ export function PaymentsPage() {
 
   // ── income report state ──
   const [reportMode, setReportMode] = useState<ReportMode>('monthly')
-  const [reportYear, setReportYear] = useState(2024)
-  const [reportMonth, setReportMonth] = useState(6)
+  const [reportYear, setReportYear] = useState(new Date().getFullYear())
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1)
   const [reportPage, setReportPage] = useState(1)
   const [reportPageSize, setReportPageSize] = useState(10)
 
-  // ── real data from API ──
+  // ── data from API ──
   const [realOrders, setRealOrders] = useState<ApiOrder[]>([])
   const [realStats, setRealStats] = useState<ApiStoreStats | null>(null)
 
@@ -423,15 +395,25 @@ export function PaymentsPage() {
 
   const totalRevenueAll = Number(realStats?.total_revenue ?? 0)
 
-  const balance = 45_250_000
+  const deliveredRevenue = realOrders
+    .filter(o => o.status === 'delivered')
+    .reduce((s, o) => s + (Number(o.total_amount ?? o.total) || 0), 0)
+  const balance = Math.max(0, deliveredRevenue - pendingSettlement)
+
+  // ── order buckets for income report ──
+  const orderBuckets = buildOrderBuckets(realOrders)
+  const availableYears = Object.keys(orderBuckets).map(Number).sort((a, b) => b - a)
+  const AVAILABLE_YEARS = availableYears.length > 0 ? availableYears : [now.getFullYear()]
+
+  const transactions = ordersToTransactions(realOrders)
 
   // ── report data ──
   const reportRows = reportMode === 'yearly'
-    ? getYearlyReport(reportYear)
-    : getMonthlyReport(reportYear, reportMonth)
+    ? getYearlyReport(orderBuckets, reportYear)
+    : getMonthlyReport(orderBuckets, reportYear, reportMonth)
 
   const summary = computeSummary(reportRows)
-  const prevSummary = getPrevSummary(reportMode, reportYear, reportMonth)
+  const prevSummary = getPrevSummary(orderBuckets, reportMode, reportYear, reportMonth)
 
   const reportPeriodLabel = reportMode === 'yearly'
     ? `Tahun ${reportYear}`
@@ -527,7 +509,7 @@ export function PaymentsPage() {
   }
 
   // ── transactions ──
-  const filtered = mockTransactions.filter(tx => {
+  const filtered = transactions.filter(tx => {
     const matchSearch =
       tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.description.toLowerCase().includes(searchTerm.toLowerCase())

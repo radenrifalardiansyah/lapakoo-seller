@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useInventory } from '../contexts/InventoryContext'
 import { useTenant } from '../contexts/TenantContext'
+import { vouchersApi, type ApiVoucher } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,26 @@ function discountPct(original: number, sale: number) {
   return original > 0 ? Math.round(((original - sale) / original) * 100) : 0
 }
 
+// ─── API mapper ───────────────────────────────────────────────────────────────
+
+function mapApiVoucher(v: ApiVoucher): Voucher {
+  const discountType = (v.type ?? v.discount_type ?? 'fixed').toLowerCase()
+  return {
+    id: String(v.id),
+    code: v.code,
+    name: v.name ?? v.title ?? v.code,
+    type: discountType === 'percentage' ? 'percentage' : 'fixed',
+    value: Number(v.discount_value ?? v.value) || 0,
+    minPurchase: Number(v.minimum_purchase ?? v.min_purchase) || 0,
+    maxDiscount: v.max_discount ? Number(v.max_discount) : null,
+    quota: Number(v.quota) || 0,
+    used: Number(v.used ?? v.used_count) || 0,
+    startDate: (v.start_date ?? '').slice(0, 10),
+    endDate: (v.end_date ?? v.expired_at ?? '').slice(0, 10),
+    disabled: v.is_active === false || v.status === 'inactive' || v.status === 'disabled',
+  }
+}
+
 // ─── Status Config ────────────────────────────────────────────────────────────
 
 const VOUCHER_STATUS_CFG: Record<VoucherStatus, { label: string; cls: string; icon: React.ElementType }> = {
@@ -129,77 +150,6 @@ const FLASH_STATUS_CFG: Record<FlashSaleStatus, { label: string; cls: string; ic
   ended:     { label: 'Selesai',     cls: 'bg-gray-50 text-gray-500 border-gray-200', icon: XCircle },
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const _now = new Date()
-const _d = (h: number) => new Date(_now.getTime() + h * 3600_000).toISOString()
-
-export const initialVouchers: Voucher[] = [
-  {
-    id: 'VCH-001', code: 'WELCOME10', name: 'Selamat Datang 10%',
-    type: 'percentage', value: 10, minPurchase: 100_000, maxDiscount: 50_000,
-    quota: 100, used: 45, startDate: '2024-01-01', endDate: '2026-12-31',
-    disabled: false, description: 'Voucher sambutan untuk pelanggan baru.',
-  },
-  {
-    id: 'VCH-002', code: 'HEMAT50K', name: 'Hemat Rp 50.000',
-    type: 'fixed', value: 50_000, minPurchase: 500_000, maxDiscount: null,
-    quota: 50, used: 50, startDate: '2024-01-01', endDate: '2024-06-30',
-    disabled: false, description: 'Potongan langsung Rp 50.000 tanpa syarat tambahan.',
-  },
-  {
-    id: 'VCH-003', code: 'FLASH20', name: 'Diskon Flash 20%',
-    type: 'percentage', value: 20, minPurchase: 200_000, maxDiscount: 100_000,
-    quota: 200, used: 78, startDate: '2025-05-01', endDate: '2026-07-31',
-    disabled: false, description: 'Voucher khusus program flash deal.',
-  },
-  {
-    id: 'VCH-004', code: 'LEBARAN25', name: 'Promo Hari Raya 25%',
-    type: 'percentage', value: 25, minPurchase: 300_000, maxDiscount: 150_000,
-    quota: 500, used: 0, startDate: '2026-06-01', endDate: '2026-06-30',
-    disabled: false, description: 'Voucher spesial Lebaran, berlaku sebulan penuh.',
-  },
-  {
-    id: 'VCH-005', code: 'VIP25K', name: 'Bonus VIP Rp 25.000',
-    type: 'fixed', value: 25_000, minPurchase: 150_000, maxDiscount: null,
-    quota: 1000, used: 312, startDate: '2024-09-01', endDate: '2026-08-31',
-    disabled: false,
-  },
-  {
-    id: 'VCH-006', code: 'OLDPROMO', name: 'Promo Lama 15%',
-    type: 'percentage', value: 15, minPurchase: 200_000, maxDiscount: 75_000,
-    quota: 300, used: 210, startDate: '2024-01-01', endDate: '2025-03-31',
-    disabled: true, description: 'Voucher lama yang sudah dinonaktifkan.',
-  },
-]
-
-const initialFlashSales: FlashSale[] = [
-  {
-    id: 'FS-001', name: 'Flash Sale Akhir Pekan',
-    startDateTime: _d(-2), endDateTime: _d(4),
-    items: [
-      { productId: 1, productName: 'iPhone 14 Pro Max', originalPrice: 15_999_000, salePrice: 13_999_000, quota: 5, sold: 3 },
-      { productId: 2, productName: 'Samsung Galaxy S23 Ultra', originalPrice: 18_999_000, salePrice: 16_499_000, quota: 8, sold: 6 },
-      { productId: 3, productName: 'MacBook Air M2', originalPrice: 18_999_000, salePrice: 17_299_000, quota: 3, sold: 1 },
-    ],
-  },
-  {
-    id: 'FS-002', name: 'Promo Gadget 6.6',
-    startDateTime: _d(3 * 24), endDateTime: _d(3 * 24 + 8),
-    items: [
-      { productId: 5, productName: 'OnePlus 11', originalPrice: 8_999_000, salePrice: 7_499_000, quota: 10, sold: 0 },
-      { productId: 6, productName: 'iPad Pro M2', originalPrice: 16_999_000, salePrice: 14_999_000, quota: 5, sold: 0 },
-    ],
-  },
-  {
-    id: 'FS-003', name: 'Flash Sale Kemarin',
-    startDateTime: _d(-50), endDateTime: _d(-26),
-    items: [
-      { productId: 4, productName: 'Nike Air Jordan 1', originalPrice: 2_499_000, salePrice: 1_899_000, quota: 20, sold: 20 },
-      { productId: 7, productName: 'Adidas Ultraboost 23', originalPrice: 2_299_000, salePrice: 1_699_000, quota: 15, sold: 12 },
-    ],
-  },
-]
 
 // ─── Status Badges ────────────────────────────────────────────────────────────
 
@@ -699,8 +649,16 @@ function FlashSaleCard({
 
 export function MarketingPage() {
   const { hasFeature, tenant } = useTenant()
-  const [vouchers, setVouchers]       = useState<Voucher[]>(initialVouchers)
-  const [flashSales, setFlashSales]   = useState<FlashSale[]>(initialFlashSales)
+  const [vouchers, setVouchers]       = useState<Voucher[]>([])
+  const [flashSales, setFlashSales]   = useState<FlashSale[]>([])
+  const [vLoading, setVLoading]       = useState(true)
+
+  useEffect(() => {
+    vouchersApi.list()
+      .then(list => setVouchers(list.map(mapApiVoucher)))
+      .catch(() => {})
+      .finally(() => setVLoading(false))
+  }, [])
   const [activeTab, setActiveTab]     = useState('vouchers')
 
   // Voucher state
@@ -754,38 +712,65 @@ export function MarketingPage() {
 
   // ── Voucher handlers ──
   const handleAddVoucher = (data: VoucherFormData) => {
-    const id = `VCH-${String(vouchers.length + 1).padStart(3, '0')}`
-    setVouchers(prev => [...prev, {
-      id, code: data.code, name: data.name, type: data.type,
-      value: Number(data.value), minPurchase: Number(data.minPurchase) || 0,
-      maxDiscount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : null,
-      quota: Number(data.quota), used: 0,
-      startDate: data.startDate, endDate: data.endDate,
-      disabled: false, description: data.description || undefined,
-    }])
+    const payload = {
+      code: data.code, name: data.name,
+      type: data.type, discount_type: data.type,
+      discount_value: Number(data.value), value: Number(data.value),
+      minimum_purchase: Number(data.minPurchase) || 0,
+      max_discount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : undefined,
+      quota: Number(data.quota),
+      start_date: data.startDate, end_date: data.endDate,
+      is_active: true,
+    }
+    vouchersApi.create(payload)
+      .then(created => setVouchers(prev => [...prev, mapApiVoucher(created)]))
+      .catch(() => {
+        const id = `VCH-${String(vouchers.length + 1).padStart(3, '0')}`
+        setVouchers(prev => [...prev, {
+          id, code: data.code, name: data.name, type: data.type,
+          value: Number(data.value), minPurchase: Number(data.minPurchase) || 0,
+          maxDiscount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : null,
+          quota: Number(data.quota), used: 0,
+          startDate: data.startDate, endDate: data.endDate,
+          disabled: false, description: data.description || undefined,
+        }])
+      })
   }
 
   const handleEditVoucher = (data: VoucherFormData) => {
     if (!editVoucher) return
-    setVouchers(prev => prev.map(v => v.id === editVoucher.id ? {
-      ...v, code: data.code, name: data.name, type: data.type,
+    const updated: Voucher = {
+      ...editVoucher, code: data.code, name: data.name, type: data.type,
       value: Number(data.value), minPurchase: Number(data.minPurchase) || 0,
       maxDiscount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : null,
       quota: Number(data.quota), startDate: data.startDate, endDate: data.endDate,
       description: data.description || undefined,
-    } : v))
+    }
+    setVouchers(prev => prev.map(v => v.id === editVoucher.id ? updated : v))
+    vouchersApi.update(editVoucher.id, {
+      code: data.code, name: data.name,
+      type: data.type, discount_type: data.type,
+      discount_value: Number(data.value),
+      minimum_purchase: Number(data.minPurchase) || 0,
+      max_discount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : undefined,
+      quota: Number(data.quota),
+      start_date: data.startDate, end_date: data.endDate,
+    }).catch(() => {})
     setEditVoucher(null)
   }
 
   const handleToggleVoucher = () => {
     if (!toggleVoucher) return
-    setVouchers(prev => prev.map(v => v.id === toggleVoucher.id ? { ...v, disabled: !v.disabled } : v))
+    const newDisabled = !toggleVoucher.disabled
+    setVouchers(prev => prev.map(v => v.id === toggleVoucher.id ? { ...v, disabled: newDisabled } : v))
+    vouchersApi.update(toggleVoucher.id, { is_active: !newDisabled, status: newDisabled ? 'disabled' : 'active' }).catch(() => {})
     setToggleVoucher(null)
   }
 
   const handleDeleteVoucher = () => {
     if (!deleteVoucher) return
     setVouchers(prev => prev.filter(v => v.id !== deleteVoucher.id))
+    vouchersApi.remove(deleteVoucher.id).catch(() => {})
     setDeleteVoucher(null)
   }
 
@@ -990,7 +975,12 @@ export function MarketingPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {filteredVouchers.length === 0 ? (
+              {vLoading ? (
+                <div className="text-center py-14 text-muted-foreground">
+                  <Tag className="w-10 h-10 mx-auto mb-3 opacity-30 animate-pulse" />
+                  <p className="text-sm">Memuat voucher...</p>
+                </div>
+              ) : filteredVouchers.length === 0 ? (
                 <div className="text-center py-14 text-muted-foreground">
                   <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">Tidak ada voucher ditemukan</p>
