@@ -60,6 +60,10 @@ interface LoginApiResponse {
   expires_at?: number;
 }
 
+// api-client.ts auto-unwraps { success, data } envelope, sehingga yang
+// diterima oleh extractSession adalah inner "data" object secara langsung.
+type UnwrappedLoginData = NonNullable<LoginApiResponse['data']> & { expires_at?: number };
+
 interface LegacyUser {
   id: string | number;
   email: string;
@@ -140,13 +144,9 @@ function mapLegacyUser(raw: LegacyUser | MeApiResponse): AuthUser {
 
 // ─── Session extractor ────────────────────────────────────────────────────────
 
-function extractSession(res: LoginApiResponse): AuthSession | null {
-  // Backend mengembalikan { success: false } dengan HTTP 200 saat kredensial salah
-  if (res.success === false) return null;
-
-  const d = res.data;
-
-  // ── Format baru: data.session.access_token + data.profile ──
+// api-client.ts sudah unwrap { success, data }, jadi d adalah inner data object.
+function extractSession(d: UnwrappedLoginData): AuthSession | null {
+  // ── Format baru: session.access_token + profile ──
   if (d?.session?.access_token && d.profile) {
     const profile = d.profile;
     const user: AuthUser = {
@@ -176,9 +176,9 @@ function extractSession(res: LoginApiResponse): AuthSession | null {
     };
   }
 
-  // ── Format lama: token + user (flat) ──
-  const token = d?.token ?? d?.access_token ?? res.token ?? res.access_token;
-  const rawUser = d?.legacy_user ?? res.user;
+  // ── Format lama: token + user (flat dalam data) ──
+  const token = d?.token ?? d?.access_token;
+  const rawUser = d?.legacy_user;
   if (!token || !rawUser) return null;
 
   const user = mapLegacyUser(rawUser);
@@ -186,7 +186,7 @@ function extractSession(res: LoginApiResponse): AuthSession | null {
   return {
     token,
     user,
-    expiresAt: res.expires_at ?? (Date.now() + SESSION_TTL_MS),
+    expiresAt: d.expires_at ?? (Date.now() + SESSION_TTL_MS),
   };
 }
 
@@ -194,7 +194,7 @@ function extractSession(res: LoginApiResponse): AuthSession | null {
 
 export async function apiLogin(email: string, password: string): Promise<LoginResponse> {
   try {
-    const res = await apiPost<LoginApiResponse>('/api/auth/login', { email, password }, { skipAuth: true });
+    const res = await apiPost<UnwrappedLoginData>('/api/auth/login', { email, password }, { skipAuth: true });
     const session = extractSession(res);
     if (!session) {
       // success: false dari API = kredensial salah
@@ -260,7 +260,11 @@ export async function apiMe(token: string): Promise<AuthUser | null> {
     const user = mapLegacyUser(res as unknown as MeApiResponse);
     saveUserCache(user);
     return user;
-  } catch {
+  } catch (err) {
+    // Token invalid/expired — jangan kembalikan cache, paksa re-login
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      return null;
+    }
     return loadUserCache();
   }
 }
@@ -285,7 +289,7 @@ export async function apiRegister(data: {
         .replace(/[^a-z0-9]/g, '')
         .slice(0, 30),
     };
-    const res = await apiPost<LoginApiResponse>('/api/auth/register', payload, { skipAuth: true });
+    const res = await apiPost<UnwrappedLoginData>('/api/auth/register', payload, { skipAuth: true });
     const session = extractSession(res);
     if (!session) throw new ApiError(500, 'Response format tidak dikenali');
     return { ok: true, session };
