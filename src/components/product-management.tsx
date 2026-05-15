@@ -955,10 +955,12 @@ export function ProductManagement({
     }
   }, [initialAction, onActionConsumed])
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filtered = products.filter(p => {
+    const name = p.name ?? ''
+    const sku = p.sku ?? ''
+    const term = searchTerm.toLowerCase()
+    return name.toLowerCase().includes(term) || sku.toLowerCase().includes(term)
+  })
 
   const isShowAll = pageSize === 0
   const effectiveSize = isShowAll ? filtered.length : pageSize

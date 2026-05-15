@@ -70,10 +70,24 @@ export async function apiRequest<T = unknown>(
   if (res.status === 204) return undefined as T;
 
   const json = await res.json();
-  // Unwrap { data: ... } envelope if present, otherwise return as-is
-  if (json && typeof json === 'object' && 'data' in json && Object.keys(json).length === 1) {
-    return (json as { data: T }).data;
+
+  if (json && typeof json === 'object') {
+    // Backend ini selalu mengembalikan { success: bool, data/error: ... }
+    // Unwrap data jika success=true
+    if ('success' in json && 'data' in json) {
+      if ((json as { success: boolean }).success === true) {
+        return (json as { success: boolean; data: T }).data;
+      }
+      // success=false dengan HTTP 200 — perlakukan sebagai error
+      const errMsg = (json as { error?: string }).error ?? 'Request gagal';
+      throw new ApiError(res.status, errMsg, json);
+    }
+    // Format lama: { data: ... } tanpa field success
+    if ('data' in json && Object.keys(json).length === 1) {
+      return (json as { data: T }).data;
+    }
   }
+
   return json as T;
 }
 
