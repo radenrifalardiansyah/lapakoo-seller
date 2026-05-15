@@ -129,9 +129,9 @@ export function clearAuthCache(): void {
 
 function mapLegacyUser(raw: LegacyUser | MeApiResponse): AuthUser {
   return {
-    id: String(raw.id),
-    email: raw.email,
-    name: raw.name ?? (raw as LegacyUser).owner_name ?? raw.email,
+    id: String(raw.id ?? ''),
+    email: raw.email ?? '',
+    name: raw.name ?? (raw as LegacyUser).owner_name ?? raw.email ?? '',
     role: (raw.role as AuthUser['role']) ?? 'owner',
     tenantId: String((raw as LegacyUser).store_id ?? '0'),
     avatarUrl: raw.avatar_url ?? (raw as LegacyUser).avatar,
@@ -225,19 +225,42 @@ export async function apiLogout(token: string): Promise<void> {
 }
 
 export async function apiMe(token: string): Promise<AuthUser | null> {
-  // Coba API dulu
   try {
-    const res = await apiGet<MeApiResponse>('/api/auth/me', {
+    const res = await apiGet<Record<string, unknown>>('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
       skipAuth: true,
     });
-    // Handle { success: false } dengan HTTP 200
-    if ((res as unknown as { success?: boolean }).success === false) return loadUserCache();
-    const user = mapLegacyUser(res);
+
+    // Handle format nested sama seperti login: { profile, user, session }
+    const profile = res.profile as ApiProfile | undefined;
+    const supaUser = res.user as SupabaseUser | undefined;
+    if (profile) {
+      const user: AuthUser = {
+        id: String(profile.id ?? ''),
+        email: supaUser?.email ?? String(res.email ?? ''),
+        name: profile.name || supaUser?.user_metadata?.full_name || String(res.email ?? ''),
+        role: (profile.role as AuthUser['role']) ?? 'owner',
+        tenantId: String(profile.tenant_id ?? '0'),
+        avatarUrl: profile.avatar_url ?? undefined,
+      };
+      saveUserCache(user);
+      if (profile.tenants) {
+        saveStoreCache({
+          id: String(profile.tenants.id),
+          tenantId: String(profile.tenant_id),
+          storeName: profile.tenants.store_name,
+          subdomain: profile.tenants.subdomain,
+          logoUrl: profile.tenants.logo_url ?? undefined,
+        });
+      }
+      return user;
+    }
+
+    // Handle format flat: { id, email, name, role, ... }
+    const user = mapLegacyUser(res as unknown as MeApiResponse);
     saveUserCache(user);
     return user;
   } catch {
-    // /api/auth/me gagal (401, network error, dll.) — gunakan cache dari login
     return loadUserCache();
   }
 }

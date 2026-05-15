@@ -251,7 +251,7 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
                 className="w-6 h-6 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-xs sm:text-[10px] font-bold shrink-0"
                 style={{ backgroundColor: primaryColor }}
               >
-                {userEmail.charAt(0).toUpperCase()}
+                {(userEmail ?? '').charAt(0).toUpperCase()}
               </div>
               <p className="hidden sm:block text-xs font-medium text-gray-700">{userEmail.split('@')[0]}</p>
               <ChevronDown className="hidden sm:block w-3 h-3 text-gray-400" />

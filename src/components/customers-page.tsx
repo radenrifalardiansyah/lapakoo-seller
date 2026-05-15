@@ -1021,7 +1021,7 @@ export function CustomersPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
                             <span className="text-sm font-semibold text-muted-foreground">
-                              {customer.name.charAt(0)}
+                              {(customer.name ?? '').charAt(0)}
                             </span>
                           </div>
                           <div className="min-w-0">

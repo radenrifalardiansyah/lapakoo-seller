@@ -59,7 +59,7 @@ export function MobileHeader({
             style={{ backgroundColor: primaryColor }}
             aria-label="Profil"
           >
-            {(userEmail.charAt(0) || 'U').toUpperCase()}
+            {((userEmail ?? '').charAt(0) || 'U').toUpperCase()}
           </button>
         </div>
       </div>

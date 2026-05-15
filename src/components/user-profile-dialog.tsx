@@ -51,7 +51,7 @@ export function UserProfileDialog({
   onLogout,
 }: UserProfileDialogProps) {
   const primaryColor = tenant?.primaryColor ?? '#6366f1';
-  const displayName = tenant?.ownerName ?? userEmail.split('@')[0];
+  const displayName = tenant?.ownerName || (userEmail ?? '').split('@')[0] || 'User';
   const pkg = tenant ? PACKAGE_BADGE[tenant.package.id] : undefined;
   const joinDate = new Date().toLocaleDateString('id-ID', {
     day: 'numeric',

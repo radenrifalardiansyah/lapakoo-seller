@@ -420,7 +420,7 @@ function ViewResellerDialog({
           {/* Profile */}
           <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-xl">
             <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ${vis.bg} ${vis.color} ring-2 ${vis.ring}`}>
-              {reseller.name.charAt(0)}
+              {(reseller.name ?? '').charAt(0)}
             </div>
             <div className="flex-1">
               <p className="text-lg font-bold">{reseller.name}</p>
@@ -1270,7 +1270,7 @@ export function ResellerPage() {
                                 <TableCell>
                                   <div className="flex items-center gap-3">
                                     <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${vis.bg} ${vis.color} ring-1 ${vis.ring}`}>
-                                      {r.name.charAt(0)}
+                                      {(r.name ?? '').charAt(0)}
                                     </div>
                                     <div>
                                       <p className="font-medium text-sm">{r.name}</p>

@@ -438,7 +438,7 @@ export function TeamPage() {
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                             style={{ backgroundColor: primaryColor }}
                           >
-                            {u.name.charAt(0)}
+                            {(u.name ?? '').charAt(0)}
                           </div>
                           <span className="font-medium text-gray-900">{u.name}</span>
                         </div>
@@ -494,7 +494,7 @@ export function TeamPage() {
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {u.name.charAt(0)}
+                    {(u.name ?? '').charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
