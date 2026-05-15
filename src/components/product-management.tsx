@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -35,8 +35,7 @@ import { ImageWithFallback } from './figma/ImageWithFallback'
 import { useInventory } from '../contexts/InventoryContext'
 import { useTenant } from '../contexts/TenantContext'
 import type { Product } from '../types/inventory'
-
-const DEFAULT_CATEGORIES = ['Electronics', 'Fashion', 'Home & Garden', 'Sports', 'Books', 'Other']
+import { categoriesApi, type ApiCategory } from '../lib/api'
 
 const emptyForm: Omit<Product, 'id'> = {
   name: '',
@@ -79,42 +78,59 @@ function CategoryManagementDialog({
   open,
   onClose,
   categories,
-  onCategoriesChange,
+  onReload,
   products,
 }: {
   open: boolean
   onClose: () => void
-  categories: string[]
-  onCategoriesChange: (cats: string[]) => void
+  categories: ApiCategory[]
+  onReload: () => void
   products: Product[]
 }) {
   const [newCat, setNewCat] = useState('')
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const productCount = (cat: string) => products.filter(p => p.category === cat).length
+  const productCount = (cat: ApiCategory) => products.filter(p => p.category === cat.name).length
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = newCat.trim()
-    if (!trimmed || categories.map(c => c.toLowerCase()).includes(trimmed.toLowerCase())) return
-    onCategoriesChange([...categories, trimmed])
-    setNewCat('')
+    if (!trimmed || categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return
+    setSaving(true)
+    try {
+      await categoriesApi.create({ name: trimmed })
+      setNewCat('')
+      onReload()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleEditSave = (idx: number) => {
+  const handleEditSave = async (cat: ApiCategory) => {
     const trimmed = editVal.trim()
     if (!trimmed) return
-    const isDuplicate = categories.some((c, i) => i !== idx && c.toLowerCase() === trimmed.toLowerCase())
+    const isDuplicate = categories.some(c => c.id !== cat.id && c.name.toLowerCase() === trimmed.toLowerCase())
     if (isDuplicate) return
-    const updated = [...categories]
-    updated[idx] = trimmed
-    onCategoriesChange(updated)
-    setEditIdx(null)
-    setEditVal('')
+    setSaving(true)
+    try {
+      await categoriesApi.update(cat.id, { name: trimmed })
+      setEditIdx(null)
+      setEditVal('')
+      onReload()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDelete = (idx: number) => {
-    onCategoriesChange(categories.filter((_, i) => i !== idx))
+  const handleDelete = async (cat: ApiCategory) => {
+    setSaving(true)
+    try {
+      await categoriesApi.remove(cat.id)
+      onReload()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -136,15 +152,16 @@ function CategoryManagementDialog({
                 value={newCat}
                 onChange={e => setNewCat(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                disabled={saving}
               />
               <Button
                 onClick={handleAdd}
-                disabled={!newCat.trim() || categories.map(c => c.toLowerCase()).includes(newCat.trim().toLowerCase())}
+                disabled={saving || !newCat.trim() || categories.some(c => c.name.toLowerCase() === newCat.trim().toLowerCase())}
               >
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
-            {newCat.trim() && categories.map(c => c.toLowerCase()).includes(newCat.trim().toLowerCase()) && (
+            {newCat.trim() && categories.some(c => c.name.toLowerCase() === newCat.trim().toLowerCase()) && (
               <p className="text-xs text-red-500">Kategori sudah ada</p>
             )}
           </div>
@@ -164,7 +181,7 @@ function CategoryManagementDialog({
               {categories.map((cat, idx) => {
                 const count = productCount(cat)
                 return (
-                  <div key={idx} className="flex items-center gap-2 p-2.5 border rounded-lg bg-muted/30">
+                  <div key={String(cat.id)} className="flex items-center gap-2 p-2.5 border rounded-lg bg-muted/30">
                     {editIdx === idx ? (
                       <>
                         <Input
@@ -172,22 +189,23 @@ function CategoryManagementDialog({
                           value={editVal}
                           onChange={e => setEditVal(e.target.value)}
                           onKeyDown={e => {
-                            if (e.key === 'Enter') handleEditSave(idx)
+                            if (e.key === 'Enter') handleEditSave(cat)
                             if (e.key === 'Escape') { setEditIdx(null); setEditVal('') }
                           }}
                           autoFocus
+                          disabled={saving}
                         />
-                        <Button size="sm" className="h-7 px-2" onClick={() => handleEditSave(idx)}>
+                        <Button size="sm" className="h-7 px-2" onClick={() => handleEditSave(cat)} disabled={saving}>
                           <Check className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditIdx(null); setEditVal('') }}>
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditIdx(null); setEditVal('') }} disabled={saving}>
                           <X className="w-3.5 h-3.5" />
                         </Button>
                       </>
                     ) : (
                       <>
                         <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="flex-1 text-sm font-medium">{cat}</span>
+                        <span className="flex-1 text-sm font-medium">{cat.name}</span>
                         <Badge variant="secondary" className="text-xs shrink-0">
                           {count} produk
                         </Badge>
@@ -195,7 +213,8 @@ function CategoryManagementDialog({
                           size="sm"
                           variant="ghost"
                           className="h-7 px-2 shrink-0"
-                          onClick={() => { setEditIdx(idx); setEditVal(cat) }}
+                          onClick={() => { setEditIdx(idx); setEditVal(cat.name) }}
+                          disabled={saving}
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </Button>
@@ -203,8 +222,8 @@ function CategoryManagementDialog({
                           size="sm"
                           variant="ghost"
                           className="h-7 px-2 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDelete(idx)}
-                          disabled={count > 0}
+                          onClick={() => handleDelete(cat)}
+                          disabled={saving || count > 0}
                           title={count > 0 ? `Tidak bisa dihapus: ${count} produk menggunakan kategori ini` : 'Hapus kategori'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -667,7 +686,7 @@ function ProductFormDialog({
   open: boolean
   onClose: () => void
   onSave: (data: Omit<Product, 'id'>, initialStock?: number) => void | Promise<void>
-  categories: string[]
+  categories: ApiCategory[]
 }) {
   const { warehouses, distributionOf, totalStockOf, primaryWarehouseId } = useInventory()
   const [form, setForm] = useState<Omit<Product, 'id'>>(initialData)
@@ -808,7 +827,7 @@ function ProductFormDialog({
                   <SelectValue placeholder="Pilih kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {categories.map(c => <SelectItem key={String(c.id)} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -935,8 +954,15 @@ export function ProductManagement({
   } = useInventory()
   const { hasFeature, tenant } = useTenant()
 
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES)
+  const [categories, setCategories] = useState<ApiCategory[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const cats = await categoriesApi.list()
+      setCategories(cats)
+    } catch { /* silent — user tetap bisa tambah produk */ }
+  }, [])
 
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
@@ -947,6 +973,8 @@ export function ProductManagement({
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
+
+  useEffect(() => { loadCategories() }, [loadCategories])
 
   useEffect(() => {
     if (initialAction === 'add') {
@@ -972,18 +1000,11 @@ export function ProductManagement({
 
   const primaryWh = warehouses.find(w => w.id === primaryWarehouseId)
 
-  // ── Category rename propagation ──
-  const handleCategoriesChange = (newCats: string[]) => {
-    categories.forEach((oldName, idx) => {
-      const newName = newCats[idx]
-      if (newName && newName !== oldName) {
-        products
-          .filter(p => p.category === oldName)
-          .forEach(p => updateProduct(p.id, { ...p, category: newName }))
-      }
-    })
-    setCategories(newCats)
-  }
+  // ── Category reload setelah CRUD ──
+  const handleCategoriesReload = useCallback(() => {
+    loadCategories()
+    reload()
+  }, [loadCategories, reload])
 
   // ── Export Excel ──
   const handleExport = () => {
@@ -1366,7 +1387,7 @@ export function ProductManagement({
         open={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onImport={bulkAddProducts}
-        categories={categories}
+        categories={categories.map(c => c.name)}
         primaryWarehouseName={primaryWh ? `${primaryWh.code} — ${primaryWh.name}` : '—'}
       />
 
@@ -1374,7 +1395,7 @@ export function ProductManagement({
         open={isCategoryOpen}
         onClose={() => setIsCategoryOpen(false)}
         categories={categories}
-        onCategoriesChange={handleCategoriesChange}
+        onReload={handleCategoriesReload}
         products={products}
       />
 
