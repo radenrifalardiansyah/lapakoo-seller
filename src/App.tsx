@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { SplashScreen } from "./components/splash-screen";
 import { TenantProvider, useTenant } from "./contexts/TenantContext";
 import { InventoryProvider, useInventory } from "./contexts/InventoryContext";
@@ -116,14 +116,23 @@ function TenantErrorScreen({ message }: { message: string }) {
 // ─── Inner app (has access to TenantContext) ──────────────────────────────────
 
 function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
-  const { tenant, loading, error, hasFeature } = useTenant();
+  const { tenant, loading, error, hasFeature, refreshTenant, resetTenant } = useTenant();
   const { products, totalStockOf } = useInventory();
-  const { user, loading: authLoading, logout, canAccessTab } = useAuth();
+  const { user, token, loading: authLoading, logout, canAccessTab } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [productAction, setProductAction] = useState<'add' | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Sinkronisasi tenant dengan sesi login — fetch store data setelah user login
+  useEffect(() => {
+    if (token) {
+      refreshTenant(token);
+    } else {
+      resetTenant();
+    }
+  }, [token, refreshTenant, resetTenant]);
 
   const goToOrders = () => {
     setActiveTab("orders");

@@ -50,4 +50,6 @@ export interface TenantContextValue {
   loading: boolean;
   error: string | null;
   hasFeature: (feature: FeatureKey) => boolean;
+  refreshTenant: (token: string) => Promise<void>;
+  resetTenant: () => void;
 }
