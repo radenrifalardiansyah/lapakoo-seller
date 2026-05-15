@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { storeApi, type ApiStore } from "../lib/api";
+import { apiChangePassword } from "../lib/auth-api";
+import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -129,24 +131,47 @@ const MOCK_SESSIONS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-function mapApiStore(s: ApiStore): StoreInfo {
+function mapApiStore(s: ApiStore) {
   return {
-    storeName: s.store_name ?? s.name ?? defaultStoreInfo.storeName,
-    description: s.description ?? defaultStoreInfo.description,
-    address: s.address ?? defaultStoreInfo.address,
-    city: s.city ?? defaultStoreInfo.city,
-    province: s.province ?? defaultStoreInfo.province,
-    postalCode: s.postal_code ?? defaultStoreInfo.postalCode,
-    phone: s.phone ?? defaultStoreInfo.phone,
-    email: s.email ?? defaultStoreInfo.email,
-    website: s.website ?? defaultStoreInfo.website,
-    operationalHours: s.operational_hours ?? defaultStoreInfo.operationalHours,
-    logo: s.logo_url ?? s.logo ?? defaultStoreInfo.logo,
+    storeInfo: {
+      storeName:        s.store_name ?? s.name              ?? defaultStoreInfo.storeName,
+      description:      s.description                        ?? defaultStoreInfo.description,
+      address:          s.address                            ?? defaultStoreInfo.address,
+      city:             s.city                               ?? defaultStoreInfo.city,
+      province:         s.province                           ?? defaultStoreInfo.province,
+      postalCode:       s.postal_code                        ?? defaultStoreInfo.postalCode,
+      phone:            s.phone                              ?? defaultStoreInfo.phone,
+      email:            s.email                              ?? defaultStoreInfo.email,
+      website:          s.website                            ?? defaultStoreInfo.website,
+      operationalHours: s.operational_hours                  ?? defaultStoreInfo.operationalHours,
+      logo:             s.logo_url ?? s.logo                 ?? defaultStoreInfo.logo,
+    } as StoreInfo,
+    decoration: {
+      themeColor:     s.theme_color                          ?? defaultDecoration.themeColor,
+      tagline:        s.tagline                              ?? defaultDecoration.tagline,
+      bannerImage:    s.banner_url ?? s.banner_image         ?? defaultDecoration.bannerImage,
+      showReviews:    s.show_reviews                         ?? defaultDecoration.showReviews,
+      showBestSellers:s.show_best_sellers                    ?? defaultDecoration.showBestSellers,
+    } as StoreDecoration,
+    shipping: {
+      ...defaultShipping,
+      freeShippingMin: String(s.free_shipping_min ?? defaultShipping.freeShippingMin),
+      packagingFee:    String(s.packaging_fee     ?? defaultShipping.packagingFee),
+      processingDays:  String(s.processing_days   ?? defaultShipping.processingDays),
+    } as ShippingConfig,
+    notifications: {
+      emailNewOrder:    s.notif_email_new_order ?? defaultNotifications.emailNewOrder,
+      smsPayment:       s.notif_sms_payment     ?? defaultNotifications.smsPayment,
+      pushNotification: s.notif_push            ?? defaultNotifications.pushNotification,
+      emailLowStock:    s.notif_email_low_stock  ?? defaultNotifications.emailLowStock,
+      emailPromotion:   s.notif_email_promotion  ?? defaultNotifications.emailPromotion,
+    } as NotificationSettings,
   }
 }
 
 export function SettingsPage() {
   const { hasFeature } = useTenant();
+  const { token } = useAuth();
 
   // ── Profil toko ──
   const [storeInfo, setStoreInfo]   = useState<StoreInfo>(defaultStoreInfo);
@@ -154,15 +179,20 @@ export function SettingsPage() {
   const [isEditing, setIsEditing]   = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [savingStore, setSavingStore] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load store data dari API on mount
+  // Load all settings from API on mount
   useEffect(() => {
+    setSettingsLoading(true);
     storeApi.get().then(apiStore => {
-      const mapped = mapApiStore(apiStore)
-      setStoreInfo(mapped)
-      setFormData(mapped)
+      const { storeInfo: info, decoration: deco, shipping: ship, notifications: notifs } = mapApiStore(apiStore);
+      setStoreInfo(info);  setFormData(info);
+      setDecoration(deco); setDecoDraft(deco);
+      setShipping(ship);   setShippingDraft(ship);
+      setNotifications(notifs);
     }).catch(() => { /* gunakan default */ })
+      .finally(() => setSettingsLoading(false));
   }, []);
 
   // ── Notifikasi ──
@@ -235,7 +265,16 @@ export function SettingsPage() {
   };
 
   // ── Dekorasi handlers ──
-  const handleDecoSave = () => {
+  const handleDecoSave = async () => {
+    try {
+      await storeApi.update({
+        theme_color:      decoDraft.themeColor,
+        tagline:          decoDraft.tagline,
+        banner_url:       decoDraft.bannerImage ?? undefined,
+        show_reviews:     decoDraft.showReviews,
+        show_best_sellers:decoDraft.showBestSellers,
+      });
+    } catch {}
     setDecoration({ ...decoDraft }); setDecoEditing(false); setDecoSaved(true);
     setTimeout(() => setDecoSaved(false), 3000);
   };
@@ -252,17 +291,46 @@ export function SettingsPage() {
     setShippingDraft(p => ({
       ...p, couriers: p.couriers.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c),
     }));
-  const handleShippingSave = () => {
+  const handleShippingSave = async () => {
+    try {
+      await storeApi.update({
+        free_shipping_min: Number(shippingDraft.freeShippingMin) || 0,
+        packaging_fee:     Number(shippingDraft.packagingFee)    || 0,
+        processing_days:   Number(shippingDraft.processingDays)  || 1,
+      });
+    } catch {}
     setShipping({ ...shippingDraft }); setShippingEditing(false); setShippingSaved(true);
     setTimeout(() => setShippingSaved(false), 3000);
   };
 
+  // ── Notifikasi handler ──
+  const NOTIF_API_KEY: Record<keyof NotificationSettings, keyof ApiStore> = {
+    emailNewOrder:    'notif_email_new_order',
+    smsPayment:       'notif_sms_payment',
+    pushNotification: 'notif_push',
+    emailLowStock:    'notif_email_low_stock',
+    emailPromotion:   'notif_email_promotion',
+  };
+
+  const handleToggleNotif = (key: keyof NotificationSettings) => {
+    const newVal = !notifications[key];
+    setNotifications(p => ({ ...p, [key]: newVal }));
+    storeApi.update({ [NOTIF_API_KEY[key]]: newVal }).catch(() => {
+      setNotifications(p => ({ ...p, [key]: !newVal }));
+    });
+  };
+
   // ── Password handler ──
-  const handleChangePwd = () => {
+  const [savingPwd, setSavingPwd] = useState(false);
+  const handleChangePwd = async () => {
     setPwdError("");
     if (!currentPwd) { setPwdError("Masukkan kata sandi saat ini"); return; }
     if (newPwd.length < 8) { setPwdError("Kata sandi baru minimal 8 karakter"); return; }
     if (newPwd !== confirmPwd) { setPwdError("Konfirmasi kata sandi tidak cocok"); return; }
+    setSavingPwd(true);
+    const result = await apiChangePassword(token ?? "", newPwd);
+    setSavingPwd(false);
+    if (!result.ok) { setPwdError((result as { ok: false; error: string }).error); return; }
     setPwdSuccess(true);
     setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
     setShowPwdForm(false);
@@ -270,6 +338,17 @@ export function SettingsPage() {
   };
 
   const pwdStrength = getPasswordStrength(newPwd);
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        <div className="text-center space-y-2">
+          <Settings className="w-10 h-10 mx-auto animate-pulse" />
+          <p>Memuat pengaturan...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -688,7 +767,7 @@ export function SettingsPage() {
                 <Badge variant={notifications[key] ? "default" : "secondary"}>
                   {notifications[key] ? "Aktif" : "Nonaktif"}
                 </Badge>
-                <Switch checked={notifications[key]} onCheckedChange={() => setNotifications(p => ({ ...p, [key]: !p[key] }))} />
+                <Switch checked={notifications[key]} onCheckedChange={() => handleToggleNotif(key)} />
               </div>
             </div>
           ))}
@@ -792,8 +871,8 @@ export function SettingsPage() {
                     onClick={() => { setShowPwdForm(false); setCurrentPwd(""); setNewPwd(""); setConfirmPwd(""); setPwdError(""); }}>
                     Batal
                   </Button>
-                  <Button size="sm" onClick={handleChangePwd}>
-                    <Check className="w-4 h-4 mr-1.5" />Simpan Kata Sandi
+                  <Button size="sm" onClick={handleChangePwd} disabled={savingPwd}>
+                    <Check className="w-4 h-4 mr-1.5" />{savingPwd ? 'Menyimpan...' : 'Simpan Kata Sandi'}
                   </Button>
                 </div>
               </div>

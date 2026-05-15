@@ -108,11 +108,23 @@ export interface ApiStore {
   operational_hours?: string;
   logo?: string;
   logo_url?: string;
+  // decoration
   theme_color?: string;
   tagline?: string;
+  banner_url?: string;
   banner_image?: string;
   show_reviews?: boolean;
   show_best_sellers?: boolean;
+  // shipping
+  free_shipping_min?: number | string;
+  packaging_fee?: number | string;
+  processing_days?: number | string;
+  // notifications
+  notif_email_new_order?: boolean;
+  notif_sms_payment?: boolean;
+  notif_push?: boolean;
+  notif_email_low_stock?: boolean;
+  notif_email_promotion?: boolean;
 }
 
 export interface ApiStoreStats {

@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 import type { AuthSession, AuthUser, LoginResponse } from '../types/auth';
-import { apiPost, apiGet, ApiError } from './api-client';
+import { apiPost, apiGet, apiPut, ApiError } from './api-client';
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8; // 8 hours
 
@@ -300,5 +300,20 @@ export async function apiRegister(data: {
       return { ok: false, error: err.message };
     }
     return { ok: false, error: 'Gagal mendaftar. Coba lagi.' };
+  }
+}
+
+export async function apiChangePassword(
+  token: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await apiPut('/api/auth/me', { password: newPassword }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ApiError) return { ok: false, error: err.message };
+    return { ok: false, error: 'Gagal mengubah kata sandi. Coba lagi.' };
   }
 }
