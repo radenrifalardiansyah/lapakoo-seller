@@ -3,7 +3,7 @@
 -- Multi-tenant SaaS seller management system
 -- =============================================================================
 -- Jalankan file ini dulu di Supabase SQL Editor sebelum 02_policies.sql dan
--- 03_seed.sql. Schema mengasumsikan extension pgcrypto untuk gen_random_uuid().
+-- 03_seed.sql.
 -- =============================================================================
 
 -- Extensions ------------------------------------------------------------------
@@ -88,7 +88,7 @@ create trigger trg_packages_updated_at before update on public.packages
 -- =============================================================================
 
 create table public.tenants (
-  id             uuid primary key default gen_random_uuid(),
+  id             bigserial primary key,
   subdomain      text unique not null,
   store_name     text not null,
   owner_name     text not null,
@@ -113,8 +113,8 @@ create trigger trg_tenants_updated_at before update on public.tenants
 -- =============================================================================
 
 create table public.tenant_users (
-  id            uuid primary key default gen_random_uuid(),
-  tenant_id     uuid not null references public.tenants(id) on delete cascade,
+  id            bigserial primary key,
+  tenant_id     bigint not null references public.tenants(id) on delete cascade,
   user_id       uuid references auth.users(id) on delete set null,
   name          text not null,
   email         citext not null,
@@ -137,7 +137,7 @@ create trigger trg_tenant_users_updated_at before update on public.tenant_users
 -- =============================================================================
 
 create table public.store_settings (
-  tenant_id           uuid primary key references public.tenants(id) on delete cascade,
+  tenant_id           bigint primary key references public.tenants(id) on delete cascade,
   description         text,
   address             text,
   city                text,
@@ -174,8 +174,8 @@ create trigger trg_store_settings_updated_at before update on public.store_setti
 -- =============================================================================
 
 create table public.courier_services (
-  id              uuid primary key default gen_random_uuid(),
-  tenant_id       uuid not null references public.tenants(id) on delete cascade,
+  id              bigserial primary key,
+  tenant_id       bigint not null references public.tenants(id) on delete cascade,
   code            text not null,              -- 'jne', 'jt', 'sicepat', ...
   name            text not null,
   enabled         boolean default true,
@@ -190,8 +190,8 @@ create index idx_courier_tenant on public.courier_services(tenant_id);
 -- =============================================================================
 
 create table public.user_sessions (
-  id            uuid primary key default gen_random_uuid(),
-  tenant_user_id uuid not null references public.tenant_users(id) on delete cascade,
+  id            bigserial primary key,
+  tenant_user_id bigint not null references public.tenant_users(id) on delete cascade,
   device        text,
   location      text,
   ip_address    text,
@@ -206,8 +206,8 @@ create index idx_user_sessions_user on public.user_sessions(tenant_user_id);
 -- =============================================================================
 
 create table public.categories (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public.tenants(id) on delete cascade,
+  id          bigserial primary key,
+  tenant_id   bigint not null references public.tenants(id) on delete cascade,
   name        text not null,
   description text,
   image_url   text,
@@ -225,9 +225,9 @@ create trigger trg_categories_updated_at before update on public.categories
 -- =============================================================================
 
 create table public.products (
-  id           uuid primary key default gen_random_uuid(),
-  tenant_id    uuid not null references public.tenants(id) on delete cascade,
-  category_id  uuid references public.categories(id) on delete set null,
+  id           bigserial primary key,
+  tenant_id    bigint not null references public.tenants(id) on delete cascade,
+  category_id  bigint references public.categories(id) on delete set null,
   name         text not null,
   description  text,
   sku          text not null,
@@ -248,8 +248,8 @@ create trigger trg_products_updated_at before update on public.products
   for each row execute function public.set_updated_at();
 
 create table public.product_images (
-  id          uuid primary key default gen_random_uuid(),
-  product_id  uuid not null references public.products(id) on delete cascade,
+  id          bigserial primary key,
+  product_id  bigint not null references public.products(id) on delete cascade,
   image_url   text not null,
   alt_text    text,
   is_primary  boolean default false,
@@ -263,8 +263,8 @@ create index idx_product_images_product on public.product_images(product_id);
 -- =============================================================================
 
 create table public.warehouses (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public.tenants(id) on delete cascade,
+  id          bigserial primary key,
+  tenant_id   bigint not null references public.tenants(id) on delete cascade,
   code        text not null,
   name        text not null,
   address     text,
@@ -283,8 +283,8 @@ create trigger trg_warehouses_updated_at before update on public.warehouses
 
 -- Stok per produk per gudang (lookup table)
 create table public.stock_distribution (
-  product_id    uuid not null references public.products(id) on delete cascade,
-  warehouse_id  uuid not null references public.warehouses(id) on delete cascade,
+  product_id    bigint not null references public.products(id) on delete cascade,
+  warehouse_id  bigint not null references public.warehouses(id) on delete cascade,
   quantity      integer not null default 0,
   updated_at    timestamptz default now(),
   primary key (product_id, warehouse_id)
@@ -294,11 +294,11 @@ create trigger trg_stock_distribution_updated_at before update on public.stock_d
   for each row execute function public.set_updated_at();
 
 create table public.stock_movements (
-  id                  uuid primary key default gen_random_uuid(),
-  tenant_id           uuid not null references public.tenants(id) on delete cascade,
-  product_id          uuid not null references public.products(id) on delete cascade,
-  warehouse_id        uuid not null references public.warehouses(id) on delete cascade,
-  ref_warehouse_id    uuid references public.warehouses(id) on delete set null,
+  id                  bigserial primary key,
+  tenant_id           bigint not null references public.tenants(id) on delete cascade,
+  product_id          bigint not null references public.products(id) on delete cascade,
+  warehouse_id        bigint not null references public.warehouses(id) on delete cascade,
+  ref_warehouse_id    bigint references public.warehouses(id) on delete set null,
   type                movement_type not null,
   qty                 integer not null,        -- selalu positif
   previous_stock      integer,
@@ -306,21 +306,21 @@ create table public.stock_movements (
   reason              text,
   performed_by        text,                    -- nama display, bukan FK
   reference_type      text,                    -- 'order', 'restock', 'adjustment', 'return'
-  reference_id        uuid,
+  reference_id        bigint,
   created_at          timestamptz default now()
 );
-create index idx_stock_mv_tenant   on public.stock_movements(tenant_id);
-create index idx_stock_mv_product  on public.stock_movements(product_id);
+create index idx_stock_mv_tenant    on public.stock_movements(tenant_id);
+create index idx_stock_mv_product   on public.stock_movements(product_id);
 create index idx_stock_mv_warehouse on public.stock_movements(warehouse_id);
-create index idx_stock_mv_type     on public.stock_movements(type);
+create index idx_stock_mv_type      on public.stock_movements(type);
 
 -- =============================================================================
 -- CUSTOMERS
 -- =============================================================================
 
 create table public.customers (
-  id            uuid primary key default gen_random_uuid(),
-  tenant_id     uuid not null references public.tenants(id) on delete cascade,
+  id            bigserial primary key,
+  tenant_id     bigint not null references public.tenants(id) on delete cascade,
   name          text not null,
   email         citext,
   phone         text,
@@ -343,8 +343,8 @@ create trigger trg_customers_updated_at before update on public.customers
   for each row execute function public.set_updated_at();
 
 create table public.customer_addresses (
-  id              uuid primary key default gen_random_uuid(),
-  customer_id     uuid not null references public.customers(id) on delete cascade,
+  id              bigserial primary key,
+  customer_id     bigint not null references public.customers(id) on delete cascade,
   type            text default 'home' check (type in ('home','office','other')),
   recipient_name  text,
   phone           text,
@@ -367,11 +367,11 @@ create trigger trg_customer_addresses_updated_at before update on public.custome
 -- =============================================================================
 
 create table public.orders (
-  id                   uuid primary key default gen_random_uuid(),
-  tenant_id            uuid not null references public.tenants(id) on delete cascade,
+  id                   bigserial primary key,
+  tenant_id            bigint not null references public.tenants(id) on delete cascade,
   order_number         text not null,
-  customer_id          uuid references public.customers(id) on delete set null,
-  customer_address_id  uuid references public.customer_addresses(id) on delete set null,
+  customer_id          bigint references public.customers(id) on delete set null,
+  customer_address_id  bigint references public.customer_addresses(id) on delete set null,
   -- snapshot data customer agar order tetap utuh meski customer berubah
   customer_name        text not null,
   customer_email       text,
@@ -385,8 +385,8 @@ create table public.orders (
   shipping_cost        numeric(15,2) default 0,
   discount_amount      numeric(15,2) default 0,
   total_amount         numeric(15,2) not null,
-  voucher_id           uuid,                       -- FK ditambahkan setelah vouchers dibuat
-  reseller_id          uuid,                       -- FK ditambahkan setelah resellers dibuat
+  voucher_id           bigint,                     -- FK ditambahkan setelah vouchers dibuat
+  reseller_id          bigint,                     -- FK ditambahkan setelah resellers dibuat
   notes                text,
   courier              text,
   tracking_number      text,
@@ -409,9 +409,9 @@ create trigger trg_orders_updated_at before update on public.orders
   for each row execute function public.set_updated_at();
 
 create table public.order_items (
-  id            uuid primary key default gen_random_uuid(),
-  order_id      uuid not null references public.orders(id) on delete cascade,
-  product_id    uuid references public.products(id) on delete set null,
+  id            bigserial primary key,
+  order_id      bigint not null references public.orders(id) on delete cascade,
+  product_id    bigint references public.products(id) on delete set null,
   product_name  text not null,                  -- snapshot
   product_sku   text,
   quantity      integer not null default 1,
@@ -423,8 +423,8 @@ create index idx_order_items_order   on public.order_items(order_id);
 create index idx_order_items_product on public.order_items(product_id);
 
 create table public.order_returns (
-  id            uuid primary key default gen_random_uuid(),
-  order_id      uuid not null references public.orders(id) on delete cascade,
+  id            bigserial primary key,
+  order_id      bigint not null references public.orders(id) on delete cascade,
   type          return_type not null,
   reason        text not null,
   notes         text,
@@ -443,9 +443,9 @@ create trigger trg_order_returns_updated_at before update on public.order_return
 -- =============================================================================
 
 create table public.payments (
-  id                uuid primary key default gen_random_uuid(),
-  tenant_id         uuid not null references public.tenants(id) on delete cascade,
-  order_id          uuid references public.orders(id) on delete cascade,
+  id                bigserial primary key,
+  tenant_id         bigint not null references public.tenants(id) on delete cascade,
+  order_id          bigint references public.orders(id) on delete cascade,
   payment_method    text not null,
   amount            numeric(15,2) not null,
   status            payment_status default 'waiting',
@@ -463,14 +463,14 @@ create trigger trg_payments_updated_at before update on public.payments
 
 -- Buku besar finansial (Penjualan/Penarikan/Refund/Biaya Admin)
 create table public.transactions (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public.tenants(id) on delete cascade,
+  id          bigserial primary key,
+  tenant_id   bigint not null references public.tenants(id) on delete cascade,
   tx_date     timestamptz default now(),
   description text not null,
   type        tx_type not null,
   amount      numeric(15,2) not null,
   status      tx_status default 'Sukses',
-  order_id    uuid references public.orders(id) on delete set null,
+  order_id    bigint references public.orders(id) on delete set null,
   created_at  timestamptz default now()
 );
 create index idx_transactions_tenant on public.transactions(tenant_id);
@@ -482,8 +482,8 @@ create index idx_transactions_date   on public.transactions(tx_date);
 -- =============================================================================
 
 create table public.vouchers (
-  id            uuid primary key default gen_random_uuid(),
-  tenant_id     uuid not null references public.tenants(id) on delete cascade,
+  id            bigserial primary key,
+  tenant_id     bigint not null references public.tenants(id) on delete cascade,
   code          text not null,
   name          text not null,
   description   text,
@@ -509,8 +509,8 @@ alter table public.orders
   foreign key (voucher_id) references public.vouchers(id) on delete set null;
 
 create table public.flash_sales (
-  id               uuid primary key default gen_random_uuid(),
-  tenant_id        uuid not null references public.tenants(id) on delete cascade,
+  id               bigserial primary key,
+  tenant_id        bigint not null references public.tenants(id) on delete cascade,
   name             text not null,
   start_datetime   timestamptz not null,
   end_datetime     timestamptz not null,
@@ -522,9 +522,9 @@ create trigger trg_flash_sales_updated_at before update on public.flash_sales
   for each row execute function public.set_updated_at();
 
 create table public.flash_sale_items (
-  id              uuid primary key default gen_random_uuid(),
-  flash_sale_id   uuid not null references public.flash_sales(id) on delete cascade,
-  product_id      uuid not null references public.products(id) on delete cascade,
+  id              bigserial primary key,
+  flash_sale_id   bigint not null references public.flash_sales(id) on delete cascade,
+  product_id      bigint not null references public.products(id) on delete cascade,
   product_name    text not null,                -- snapshot
   original_price  numeric(15,2) not null,
   sale_price      numeric(15,2) not null,
@@ -540,7 +540,7 @@ create index idx_flash_sale_items_product on public.flash_sale_items(product_id)
 -- =============================================================================
 
 create table public.reseller_tier_settings (
-  tenant_id    uuid not null references public.tenants(id) on delete cascade,
+  tenant_id    bigint not null references public.tenants(id) on delete cascade,
   tier         reseller_tier not null,
   commission   numeric(5,2) not null,            -- %
   min_sales    numeric(15,2) default 0,
@@ -552,8 +552,8 @@ create trigger trg_reseller_tier_settings_updated_at before update on public.res
   for each row execute function public.set_updated_at();
 
 create table public.resellers (
-  id                  uuid primary key default gen_random_uuid(),
-  tenant_id           uuid not null references public.tenants(id) on delete cascade,
+  id                  bigserial primary key,
+  tenant_id           bigint not null references public.tenants(id) on delete cascade,
   code                text not null,             -- 'RSL-001'
   name                text not null,
   email               citext,
@@ -585,10 +585,10 @@ alter table public.orders
   foreign key (reseller_id) references public.resellers(id) on delete set null;
 
 create table public.reseller_commissions (
-  id           uuid primary key default gen_random_uuid(),
-  tenant_id    uuid not null references public.tenants(id) on delete cascade,
-  reseller_id  uuid not null references public.resellers(id) on delete cascade,
-  order_id     uuid references public.orders(id) on delete set null,
+  id           bigserial primary key,
+  tenant_id    bigint not null references public.tenants(id) on delete cascade,
+  reseller_id  bigint not null references public.resellers(id) on delete cascade,
+  order_id     bigint references public.orders(id) on delete set null,
   amount       numeric(15,2) not null,
   status       text default 'pending' check (status in ('pending','paid','cancelled')),
   paid_at      timestamptz,
@@ -607,9 +607,9 @@ create trigger trg_reseller_comm_updated_at before update on public.reseller_com
 -- =============================================================================
 
 create table public.notifications (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public.tenants(id) on delete cascade,
-  user_id     uuid references public.tenant_users(id) on delete cascade,
+  id          bigserial primary key,
+  tenant_id   bigint not null references public.tenants(id) on delete cascade,
+  user_id     bigint references public.tenant_users(id) on delete cascade,
   type        notif_type not null,
   title       text not null,
   message     text not null,
@@ -628,9 +628,9 @@ create index idx_notifications_status on public.notifications(status);
 -- =============================================================================
 
 create table public.chat_threads (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public.tenants(id) on delete cascade,
-  user_id     uuid references public.tenant_users(id) on delete set null,
+  id          bigserial primary key,
+  tenant_id   bigint not null references public.tenants(id) on delete cascade,
+  user_id     bigint references public.tenant_users(id) on delete set null,
   subject     text,
   status      text default 'open' check (status in ('open','resolved','escalated')),
   created_at  timestamptz default now(),
@@ -641,8 +641,8 @@ create trigger trg_chat_threads_updated_at before update on public.chat_threads
   for each row execute function public.set_updated_at();
 
 create table public.chat_messages (
-  id          uuid primary key default gen_random_uuid(),
-  thread_id   uuid not null references public.chat_threads(id) on delete cascade,
+  id          bigserial primary key,
+  thread_id   bigint not null references public.chat_threads(id) on delete cascade,
   role        chat_role not null,
   text        text not null,
   sent_at     timestamptz default now()
@@ -654,8 +654,8 @@ create index idx_chat_messages_thread on public.chat_messages(thread_id);
 -- =============================================================================
 
 create table public.daily_stats (
-  id                uuid primary key default gen_random_uuid(),
-  tenant_id         uuid not null references public.tenants(id) on delete cascade,
+  id                bigserial primary key,
+  tenant_id         bigint not null references public.tenants(id) on delete cascade,
   stat_date         date not null,
   total_sales       numeric(15,2) default 0,
   total_orders      integer default 0,
@@ -670,9 +670,9 @@ create index idx_daily_stats_date   on public.daily_stats(stat_date);
 
 -- AI sinyal forecast per produk (cached output dari pipeline)
 create table public.product_signals (
-  id                    uuid primary key default gen_random_uuid(),
-  tenant_id             uuid not null references public.tenants(id) on delete cascade,
-  product_id            uuid not null references public.products(id) on delete cascade,
+  id                    bigserial primary key,
+  tenant_id             bigint not null references public.tenants(id) on delete cascade,
+  product_id            bigint not null references public.products(id) on delete cascade,
   avg_daily_sales       numeric(10,2) default 0,
   prev_avg_daily_sales  numeric(10,2) default 0,
   trend_pct             numeric(6,2) default 0,

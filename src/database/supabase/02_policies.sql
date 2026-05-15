@@ -11,7 +11,7 @@
 
 -- Helper: tenant_id user saat ini berdasarkan auth.uid()
 create or replace function public.auth_tenant_id()
-returns uuid
+returns bigint
 language sql
 stable
 security definer
