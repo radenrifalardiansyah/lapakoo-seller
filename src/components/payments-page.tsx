@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 import { TruncatedText } from './ui/truncated-text'
+import { ordersApi, storeApi, type ApiOrder, type ApiStoreStats } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -398,6 +399,30 @@ export function PaymentsPage() {
   const [reportPage, setReportPage] = useState(1)
   const [reportPageSize, setReportPageSize] = useState(10)
 
+  // ── real data from API ──
+  const [realOrders, setRealOrders] = useState<ApiOrder[]>([])
+  const [realStats, setRealStats] = useState<ApiStoreStats | null>(null)
+
+  useEffect(() => {
+    ordersApi.list().then(setRealOrders).catch(() => {})
+    storeApi.stats().then(setRealStats).catch(() => {})
+  }, [])
+
+  const now = new Date()
+  const revenueThisMonth = realOrders
+    .filter(o => {
+      const d = new Date(o.created_at ?? o.order_date ?? '')
+      return (o.status === 'delivered') &&
+        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    })
+    .reduce((s, o) => s + (Number(o.total_amount ?? o.total) || 0), 0)
+
+  const pendingSettlement = realOrders
+    .filter(o => o.payment_status === 'paid' && (o.status === 'processing' || o.status === 'shipped'))
+    .reduce((s, o) => s + (Number(o.total_amount ?? o.total) || 0), 0)
+
+  const totalRevenueAll = Number(realStats?.total_revenue ?? 0)
+
   const balance = 45_250_000
 
   // ── report data ──
@@ -601,7 +626,7 @@ export function PaymentsPage() {
             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold text-amber-600 truncate leading-tight tabular-nums text-right">{formatPrice(12_800_000)}</TruncatedText>
+            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold text-amber-600 truncate leading-tight tabular-nums text-right">{formatPrice(pendingSettlement)}</TruncatedText>
             <p className="text-xs text-muted-foreground mt-auto pt-2">Dicairkan dalam 1–3 hari kerja</p>
           </CardContent>
         </Card>
@@ -611,9 +636,9 @@ export function PaymentsPage() {
             <TrendingUp className="h-4 w-4 text-blue-500 shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(185_000_000)}</TruncatedText>
+            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(revenueThisMonth)}</TruncatedText>
             <p className="text-xs text-muted-foreground mt-auto pt-2 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-green-500 shrink-0" />+12.5% dari bulan lalu
+              <TrendingUp className="w-3 h-3 text-green-500 shrink-0" />dari pesanan selesai bulan ini
             </p>
           </CardContent>
         </Card>
@@ -623,8 +648,8 @@ export function PaymentsPage() {
             <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
-            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(238_500_000)}</TruncatedText>
-            <p className="text-xs text-muted-foreground mt-auto pt-2">Sepanjang waktu</p>
+            <TruncatedText as="div" className="text-lg xl:text-2xl font-bold truncate leading-tight tabular-nums text-right">{formatPrice(totalRevenueAll)}</TruncatedText>
+            <p className="text-xs text-muted-foreground mt-auto pt-2">Total omzet dari pesanan selesai</p>
           </CardContent>
         </Card>
       </div>

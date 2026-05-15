@@ -920,7 +920,7 @@ export function CustomersPage() {
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">1.247</TruncatedText>
+            <TruncatedText as="div" className="text-2xl font-bold text-right tabular-nums truncate">{totalCustomers.toLocaleString('id-ID')}</TruncatedText>
             <p className="text-xs text-muted-foreground">pelanggan terdaftar</p>
           </CardContent>
         </Card>

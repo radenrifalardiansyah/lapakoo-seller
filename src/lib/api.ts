@@ -116,9 +116,16 @@ export interface ApiStore {
 }
 
 export interface ApiStoreStats {
+  // Fields returned by /api/store/stats
+  total_products?: number;
+  total_orders?: number;
+  total_customers?: number;
+  low_stock_products?: number;
+  total_revenue?: number;
+  orders_by_status?: Record<string, number>;
+  // Optional extended fields (for future API expansion)
   revenue?: number | string;
   revenue_this_month?: number | string;
-  total_orders?: number | string;
   orders_this_month?: number | string;
   new_customers?: number | string;
   new_customers_this_month?: number | string;
@@ -259,7 +266,7 @@ export const ordersApi = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const customersApi = {
-  list: () => apiGet<ApiCustomer[] | { data: ApiCustomer[] }>('/api/customers').then(normalizeList<ApiCustomer>),
+  list: () => apiGet<ApiCustomer[] | { data: ApiCustomer[] }>('/api/customers?limit=1000').then(normalizeList<ApiCustomer>),
   get: (id: number | string) => apiGet<ApiCustomer>(`/api/customers/${id}`),
   create: (data: Partial<ApiCustomer>) => apiPost<ApiCustomer>('/api/customers', data),
   update: (id: number | string, data: Partial<ApiCustomer>) => apiPut<ApiCustomer>(`/api/customers/${id}`, data),

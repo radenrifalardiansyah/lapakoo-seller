@@ -170,28 +170,36 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
   }, [])
 
   // KPI cards from real API data
+  // /api/store/stats returns: total_revenue, total_orders, total_customers, orders_by_status
+  const totalOrders = Number(stats?.total_orders ?? stats?.orders_this_month ?? 0)
+  const totalRevenue = Number(stats?.total_revenue ?? stats?.revenue_this_month ?? stats?.revenue ?? 0)
+  const totalCustomers = Number(stats?.total_customers ?? stats?.new_customers ?? 0)
+  const avgOrderValue = totalOrders > 0
+    ? totalRevenue / totalOrders
+    : Number(stats?.average_order_value ?? 0)
+
   const kpiCards = [
     {
-      label: 'Pendapatan Bulan Ini',
-      value: formatRp(Number(stats?.revenue_this_month ?? stats?.revenue ?? 0)),
+      label: 'Total Pendapatan',
+      value: formatRp(totalRevenue),
       icon: Banknote,
       color: 'text-green-500',
     },
     {
       label: 'Total Pesanan',
-      value: String(stats?.orders_this_month ?? stats?.total_orders ?? 0),
+      value: totalOrders.toLocaleString('id-ID'),
       icon: ShoppingCart,
       color: 'text-blue-500',
     },
     {
-      label: 'Pelanggan Baru',
-      value: String(stats?.new_customers_this_month ?? stats?.new_customers ?? 0),
+      label: 'Total Pelanggan',
+      value: totalCustomers.toLocaleString('id-ID'),
       icon: Users,
       color: 'text-purple-500',
     },
     {
       label: 'Rata-rata Nilai Pesan',
-      value: formatRp(Number(stats?.average_order_value ?? 0)),
+      value: formatRp(avgOrderValue),
       icon: Target,
       color: 'text-orange-500',
     },
