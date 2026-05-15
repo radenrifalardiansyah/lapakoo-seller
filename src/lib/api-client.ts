@@ -1,7 +1,9 @@
 // ─── Centralized HTTP client untuk semua request ke backend API ──────────────
 // Semua komponen dan service harus pakai fungsi ini, bukan fetch() langsung.
 
-export const API_BASE = 'https://lapakoo-client-api.vercel.app';
+// Saat development, Vite proxy meneruskan /api/* ke API server (bypass CORS).
+// Saat production build, gunakan URL penuh.
+export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const TOKEN_KEY = 'auth.token';
 
