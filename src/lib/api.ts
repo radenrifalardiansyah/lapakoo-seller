@@ -175,10 +175,14 @@ export interface ApiInventoryRecord {
   product_name?: string;
   warehouse_id?: string;
   warehouse_name?: string;
-  quantity?: number;
-  stock?: number;
+  qty?: number;
+  previous_stock?: number;
+  new_stock?: number;
   type?: string;
   reason?: string;
+  reference_type?: string;
+  reference_id?: string;
+  ref_warehouse_id?: string;
   created_at?: string;
 }
 

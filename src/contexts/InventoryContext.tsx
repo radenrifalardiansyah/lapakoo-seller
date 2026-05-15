@@ -308,7 +308,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     inventoryApi.create({
       product_id: productId,
       warehouse_id: warehouseId,
-      quantity: delta,
+      qty: Math.abs(delta),
       type: delta >= 0 ? 'adjustment_in' : 'adjustment_out',
       reason,
     }).catch(() => { /* ignore — state lokal sudah diupdate */ })
