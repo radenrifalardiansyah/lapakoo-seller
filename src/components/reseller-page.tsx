@@ -208,14 +208,27 @@ function TierSettingsDialog({
   const [draft, setDraft] = useState<Record<ResellerTier, TierBusinessConfig>>(settings)
   const [errors, setErrors] = useState<Partial<Record<ResellerTier, string>>>({})
 
-  const handleOpenChange = (o: boolean) => {
-    if (o) { setDraft(settings); setErrors({}) }
-    else onClose()
-  }
+  useEffect(() => {
+    if (open) { setDraft(settings); setErrors({}) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const handleOpenChange = (o: boolean) => { if (!o) onClose() }
 
   const setField = (tier: ResellerTier, field: keyof TierBusinessConfig, raw: string) => {
     const num = raw === '' ? 0 : Number(raw.replace(/\D/g, ''))
-    setDraft(prev => ({ ...prev, [tier]: { ...prev[tier], [field]: field === 'maxSales' ? (raw === '' ? null : num) : num } }))
+    const value = field === 'maxSales' ? (raw === '' ? null : num) : num
+    setDraft(prev => {
+      const next = { ...prev, [tier]: { ...prev[tier], [field]: value } }
+      if (field === 'maxSales') {
+        const idx = TIERS.indexOf(tier)
+        if (idx < TIERS.length - 1) {
+          const nextTier = TIERS[idx + 1]
+          next[nextTier] = { ...next[nextTier], minSales: value ?? 0 }
+        }
+      }
+      return next
+    })
     setErrors(prev => ({ ...prev, [tier]: undefined }))
   }
 
