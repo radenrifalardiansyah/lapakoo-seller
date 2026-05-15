@@ -244,7 +244,7 @@ export const categoriesApi = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const ordersApi = {
-  list: () => apiGet<ApiOrder[] | { data: ApiOrder[] }>('/api/orders').then(normalizeList<ApiOrder>),
+  list: () => apiGet<ApiOrder[] | { data: ApiOrder[] }>('/api/orders?limit=1000').then(normalizeList<ApiOrder>),
   get: (id: string | number) => apiGet<ApiOrder>(`/api/orders/${id}`),
   update: (id: string | number, data: Partial<ApiOrder>) => apiPut<ApiOrder>(`/api/orders/${id}`, data),
   getReturn: (id: string | number) => apiGet<ApiReturn>(`/api/orders/${id}/return`),

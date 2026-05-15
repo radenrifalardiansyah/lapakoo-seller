@@ -837,7 +837,7 @@ function ProductFormDialog({
                 id="p-price"
                 type="text"
                 inputMode="numeric"
-                value={rawNums.price}
+                value={rawNums.price ? Number(rawNums.price).toLocaleString('id-ID') : ''}
                 onChange={e => setRaw('price', e.target.value)}
                 onFocus={e => e.target.select()}
                 placeholder="0"
@@ -856,7 +856,7 @@ function ProductFormDialog({
                   id="p-stock"
                   type="text"
                   inputMode="numeric"
-                  value={rawNums.stock}
+                  value={rawNums.stock ? Number(rawNums.stock).toLocaleString('id-ID') : ''}
                   onChange={e => setRaw('stock', e.target.value)}
                   onFocus={e => e.target.select()}
                   placeholder="0"
@@ -876,7 +876,7 @@ function ProductFormDialog({
                 id="p-weight"
                 type="text"
                 inputMode="numeric"
-                value={rawNums.weight}
+                value={rawNums.weight ? Number(rawNums.weight).toLocaleString('id-ID') : ''}
                 onChange={e => setRaw('weight', e.target.value)}
                 onFocus={e => e.target.select()}
                 placeholder="0"

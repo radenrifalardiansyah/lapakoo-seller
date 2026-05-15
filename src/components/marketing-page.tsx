@@ -324,7 +324,7 @@ function VoucherFormDialog({
                 </span>
                 <Input
                   type="text" inputMode="numeric"
-                  value={form.value}
+                  value={form.value && form.type === 'fixed' ? Number(form.value).toLocaleString('id-ID') : form.value}
                   onChange={e => set('value', e.target.value.replace(/\D/g, ''))}
                   onFocus={e => e.target.select()}
                   placeholder={form.type === 'percentage' ? '10' : '50000'}
@@ -338,7 +338,8 @@ function VoucherFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5 min-w-0">
               <Label>Min. Pembelian (Rp)</Label>
-              <Input type="text" inputMode="numeric" value={form.minPurchase}
+              <Input type="text" inputMode="numeric"
+                value={form.minPurchase ? Number(form.minPurchase).toLocaleString('id-ID') : ''}
                 onChange={e => set('minPurchase', e.target.value.replace(/\D/g, ''))}
                 onFocus={e => e.target.select()} placeholder="0" />
               {form.minPurchase && <TruncatedText className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.minPurchase))}</TruncatedText>}
@@ -346,7 +347,8 @@ function VoucherFormDialog({
             {form.type === 'percentage' && (
               <div className="space-y-1.5 min-w-0">
                 <Label>Maks. Diskon (Rp)</Label>
-                <Input type="text" inputMode="numeric" value={form.maxDiscount}
+                <Input type="text" inputMode="numeric"
+                  value={form.maxDiscount ? Number(form.maxDiscount).toLocaleString('id-ID') : ''}
                   onChange={e => set('maxDiscount', e.target.value.replace(/\D/g, ''))}
                   onFocus={e => e.target.select()} placeholder="Opsional" />
                 {form.maxDiscount && <TruncatedText className="text-[10px] text-muted-foreground tabular-nums truncate">{formatPrice(Number(form.maxDiscount))}</TruncatedText>}
@@ -538,7 +540,8 @@ function FlashSaleFormDialog({
                 </Select>
                 <div className="flex items-center">
                   <span className="px-2 h-9 flex items-center bg-background border border-r-0 rounded-l-md text-xs text-muted-foreground">Rp</span>
-                  <Input type="text" inputMode="numeric" value={addSalePrice}
+                  <Input type="text" inputMode="numeric"
+                    value={addSalePrice ? Number(addSalePrice).toLocaleString('id-ID') : ''}
                     onChange={e => { setAddSalePrice(e.target.value.replace(/\D/g, '')); setAddError('') }}
                     onFocus={e => e.target.select()}
                     placeholder="Harga flash" className="rounded-l-none" />
