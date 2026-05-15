@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import type { Tenant, TenantContextValue, FeatureKey, Package } from '../types/tenant';
 import { apiGet } from '../lib/api-client';
 import type { ApiStore } from '../lib/api';
+import { loadStoreCache } from '../lib/auth-api';
 
 // ─── Package definitions ──────────────────────────────────────────────────────
 
@@ -113,10 +114,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         skipAuth: true,
       });
       setTenant(mapStoreToTenant(store));
-    } catch (err) {
-      console.warn('[tenant] Gagal memuat data toko:', err);
-      // Tetap pakai default agar app tidak crash
-      setTenant(DEFAULT_TENANT);
+    } catch {
+      // /api/store gagal — gunakan data dari cache login (profile.tenants)
+      const cached = loadStoreCache();
+      if (cached) {
+        setTenant({
+          ...DEFAULT_TENANT,
+          id: cached.id,
+          subdomain: cached.subdomain,
+          storeName: cached.storeName,
+          logoUrl: cached.logoUrl,
+          primaryColor: cached.primaryColor ?? DEFAULT_TENANT.primaryColor,
+        });
+      } else {
+        setTenant(DEFAULT_TENANT);
+      }
     } finally {
       setLoading(false);
     }
