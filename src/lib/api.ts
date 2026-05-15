@@ -233,6 +233,19 @@ export interface ApiNotification {
   created_at?: string;
 }
 
+export interface ApiTeamUser {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'admin' | 'staff';
+  status: 'active' | 'inactive';
+  avatar_url?: string | null;
+  last_login?: string | null;
+  created_at?: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PRODUCTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -360,6 +373,19 @@ export const warehousesApi = {
 export const inventoryApi = {
   list: () => apiGet<ApiInventoryRecord[] | { data: ApiInventoryRecord[] }>('/api/inventory').then(normalizeList<ApiInventoryRecord>),
   create: (data: ApiInventoryRecord) => apiPost<ApiInventoryRecord>('/api/inventory', data),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEAM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const teamApi = {
+  list: () => apiGet<ApiTeamUser[]>('/api/team'),
+  create: (data: { name: string; email: string; password: string; role: 'admin' | 'staff' }) =>
+    apiPost<ApiTeamUser>('/api/team', data),
+  update: (id: string, data: { name?: string; role?: 'admin' | 'staff'; status?: 'active' | 'inactive' }) =>
+    apiPut<ApiTeamUser>(`/api/team/${id}`, data),
+  remove: (id: string) => apiDelete(`/api/team/${id}`),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

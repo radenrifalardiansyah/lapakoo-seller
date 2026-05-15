@@ -1,28 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Users, UserPlus, Pencil, Trash2, ShieldCheck, User, Crown,
-  Mail, Eye, EyeOff, AlertTriangle, CheckCircle2, XCircle,
+  Mail, Eye, EyeOff, AlertTriangle, CheckCircle2, XCircle, Loader2,
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { teamApi, type ApiTeamUser } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Role = 'owner' | 'admin' | 'staff'
 type UserStatus = 'active' | 'inactive'
-
-interface TeamUser {
-  id: number
-  name: string
-  email: string
-  role: Role
-  status: UserStatus
-  lastLogin: string | null
-  createdAt: string
-}
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,18 +34,16 @@ const ROLE_ICONS: Record<Role, typeof Crown> = {
   staff: User,
 }
 
-function formatDate(val: string | null) {
+function formatDate(val: string | null | undefined) {
   if (!val) return '—'
   return val.replace('T', ' ').slice(0, 16)
 }
 
-let nextId = 100
-
 // ─── Dialog: Add / Edit User ──────────────────────────────────────────────────
 
 interface UserDialogProps {
-  user: TeamUser | null
-  onSave: (data: Omit<TeamUser, 'id' | 'lastLogin' | 'createdAt'> & { password?: string }) => void
+  user: ApiTeamUser | null
+  onSave: (data: { name: string; email: string; password?: string; role: 'admin' | 'staff'; status: UserStatus }) => Promise<void>
   onClose: () => void
   primaryColor: string
 }
@@ -66,9 +54,10 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
   const [email, setEmail] = useState(user?.email ?? '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [role, setRole] = useState<Role>(user?.role ?? 'staff')
+  const [role, setRole] = useState<'admin' | 'staff'>((user?.role === 'owner' ? 'admin' : user?.role) ?? 'staff')
   const [status, setStatus] = useState<UserStatus>(user?.status ?? 'active')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const validate = () => {
     const errs: Record<string, string> = {}
@@ -80,10 +69,15 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
     return errs
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
-    onSave({ name: name.trim(), email: email.trim(), role, status, password: password || undefined })
+    setSaving(true)
+    try {
+      await onSave({ name: name.trim(), email: email.trim(), role, status, password: password || undefined })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -156,7 +150,7 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1">Role</label>
             <div className="grid grid-cols-2 gap-2">
-              {(['admin', 'staff'] as Role[]).map(r => {
+              {(['admin', 'staff'] as const).map(r => {
                 const Icon = ROLE_ICONS[r]
                 const isSelected = role === r
                 return (
@@ -211,13 +205,14 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
         </div>
 
         <div className="flex gap-2 px-6 py-4 border-t">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Batal</Button>
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Batal</Button>
           <Button
             className="flex-1 text-white"
             style={{ backgroundColor: primaryColor }}
             onClick={handleSubmit}
+            disabled={saving}
           >
-            {isEdit ? 'Simpan Perubahan' : 'Tambah User'}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEdit ? 'Simpan Perubahan' : 'Tambah User'}
           </Button>
         </div>
       </div>
@@ -227,10 +222,11 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
 
 // ─── Confirm Delete Dialog ────────────────────────────────────────────────────
 
-function ConfirmDeleteDialog({ user, onConfirm, onClose }: {
-  user: TeamUser
+function ConfirmDeleteDialog({ user, onConfirm, onClose, deleting }: {
+  user: ApiTeamUser
   onConfirm: () => void
   onClose: () => void
+  deleting: boolean
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -248,9 +244,9 @@ function ConfirmDeleteDialog({ user, onConfirm, onClose }: {
           Apakah Anda yakin ingin menghapus <strong>{user.name}</strong>? User ini tidak akan bisa mengakses dashboard lagi.
         </p>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Batal</Button>
-          <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white" onClick={onConfirm}>
-            Ya, Hapus
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={deleting}>Batal</Button>
+          <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white" onClick={onConfirm} disabled={deleting}>
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ya, Hapus'}
           </Button>
         </div>
       </div>
@@ -262,43 +258,68 @@ function ConfirmDeleteDialog({ user, onConfirm, onClose }: {
 
 export function TeamPage() {
   const { tenant } = useTenant()
-  const [users, setUsers] = useState<TeamUser[]>([])
-  const [dialogTarget, setDialogTarget] = useState<TeamUser | null | 'new'>(null)
-  const [deleteTarget, setDeleteTarget] = useState<TeamUser | null>(null)
+  const [users, setUsers] = useState<ApiTeamUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [dialogTarget, setDialogTarget] = useState<ApiTeamUser | null | 'new'>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ApiTeamUser | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const primaryColor = tenant?.primaryColor ?? '#6366f1'
   const maxUsers = tenant?.package.maxUsers ?? 1
   const isUnlimited = maxUsers === -1
   const atLimit = !isUnlimited && users.length >= maxUsers
 
+  const fetchTeam = useCallback(async () => {
+    setLoading(true)
+    setApiError(null)
+    try {
+      const data = await teamApi.list()
+      setUsers(Array.isArray(data) ? data : [])
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Gagal memuat data tim')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchTeam() }, [fetchTeam])
+
   const openAdd = () => setDialogTarget('new')
-  const openEdit = (u: TeamUser) => setDialogTarget(u)
+  const openEdit = (u: ApiTeamUser) => setDialogTarget(u)
   const closeDialog = () => setDialogTarget(null)
 
-  const handleSave = (data: Omit<TeamUser, 'id' | 'lastLogin' | 'createdAt'> & { password?: string }) => {
+  const handleSave = async (data: { name: string; email: string; password?: string; role: 'admin' | 'staff'; status: UserStatus }) => {
     if (dialogTarget === 'new') {
-      setUsers(v => [...v, {
-        id: ++nextId,
+      await teamApi.create({
         name: data.name,
         email: data.email,
+        password: data.password!,
+        role: data.role,
+      })
+    } else if (dialogTarget && typeof dialogTarget !== 'string') {
+      await teamApi.update((dialogTarget as ApiTeamUser).id, {
+        name: data.name,
         role: data.role,
         status: data.status,
-        lastLogin: null,
-        createdAt: new Date().toISOString().slice(0, 10),
-      }])
-    } else if (dialogTarget) {
-      setUsers(v => v.map(u =>
-        u.id === (dialogTarget as TeamUser).id
-          ? { ...u, name: data.name, role: data.role, status: data.status }
-          : u
-      ))
+      })
     }
     closeDialog()
+    fetchTeam()
   }
 
-  const handleDelete = (u: TeamUser) => {
-    setUsers(v => v.filter(x => x.id !== u.id))
-    setDeleteTarget(null)
+  const handleDelete = async (u: ApiTeamUser) => {
+    setDeleting(true)
+    try {
+      await teamApi.remove(u.id)
+      setDeleteTarget(null)
+      fetchTeam()
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Gagal menghapus user')
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -323,6 +344,14 @@ export function TeamPage() {
         </Button>
       </div>
 
+      {/* Error banner */}
+      {apiError && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {apiError}
+        </div>
+      )}
+
       {/* Limit info card */}
       <div
         className="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-4"
@@ -346,7 +375,6 @@ export function TeamPage() {
           </div>
         </div>
 
-        {/* Progress bar (only for limited packages) */}
         {!isUnlimited && (
           <div className="flex-1 max-w-xs">
             <div className="flex justify-between text-[11px] text-gray-500 mb-1">
@@ -382,117 +410,131 @@ export function TeamPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-gray-50/70 text-xs text-gray-500 font-semibold uppercase tracking-wider">
-                  <th className="text-left px-6 py-3">Nama</th>
-                  <th className="text-left px-6 py-3">Email</th>
-                  <th className="text-left px-4 py-3">Role</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Login Terakhir</th>
-                  <th className="text-left px-4 py-3">Bergabung</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-gray-400">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span className="text-sm">Memuat data tim...</span>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <Users className="w-10 h-10 mb-2 opacity-30" />
+              <p className="text-sm">Belum ada anggota tim</p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50/70 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                      <th className="text-left px-6 py-3">Nama</th>
+                      <th className="text-left px-6 py-3">Email</th>
+                      <th className="text-left px-4 py-3">Role</th>
+                      <th className="text-left px-4 py-3">Status</th>
+                      <th className="text-left px-4 py-3">Login Terakhir</th>
+                      <th className="text-left px-4 py-3">Bergabung</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {users.map(u => {
+                      const RoleIcon = ROLE_ICONS[u.role]
+                      return (
+                        <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                                style={{ backgroundColor: primaryColor }}
+                              >
+                                {(u.name ?? '').charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-gray-900">{u.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-500">{u.email}</td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${ROLE_COLORS[u.role]}`}>
+                              <RoleIcon className="w-3 h-3" />
+                              {ROLE_LABELS[u.role]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge variant={u.status === 'active' ? 'default' : 'secondary'} className={u.status === 'active' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
+                              {u.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4 text-gray-400 text-xs">{formatDate(u.last_login)}</td>
+                          <td className="px-4 py-4 text-gray-400 text-xs">{formatDate(u.created_at)}</td>
+                          <td className="px-4 py-4">
+                            {u.role !== 'owner' && (
+                              <div className="flex items-center gap-1 justify-end">
+                                <button
+                                  onClick={() => openEdit(u)}
+                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget(u)}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                  title="Hapus"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-gray-50">
                 {users.map(u => {
                   const RoleIcon = ROLE_ICONS[u.role]
                   return (
-                    <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                            style={{ backgroundColor: primaryColor }}
-                          >
-                            {(u.name ?? '').charAt(0)}
-                          </div>
-                          <span className="font-medium text-gray-900">{u.name}</span>
+                    <div key={u.id} className="px-4 py-4 flex items-start gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        {(u.name ?? '').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${ROLE_COLORS[u.role]}`}>
+                            <RoleIcon className="w-3 h-3" />
+                            {ROLE_LABELS[u.role]}
+                          </span>
+                          <Badge variant="secondary" className={`text-[10px] ${u.status === 'active' ? 'bg-green-100 text-green-700' : ''}`}>
+                            {u.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                          </Badge>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-500">{u.email}</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${ROLE_COLORS[u.role]}`}>
-                          <RoleIcon className="w-3 h-3" />
-                          {ROLE_LABELS[u.role]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge variant={u.status === 'active' ? 'default' : 'secondary'} className={u.status === 'active' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
-                          {u.status === 'active' ? 'Aktif' : 'Nonaktif'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4 text-gray-400 text-xs">{formatDate(u.lastLogin)}</td>
-                      <td className="px-4 py-4 text-gray-400 text-xs">{u.createdAt}</td>
-                      <td className="px-4 py-4">
-                        {u.role !== 'owner' && (
-                          <div className="flex items-center gap-1 justify-end">
-                            <button
-                              onClick={() => openEdit(u)}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteTarget(u)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                              title="Hapus"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                        <p className="text-xs text-gray-400 mt-0.5">{u.email}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Login terakhir: {formatDate(u.last_login)}</p>
+                      </div>
+                      {u.role !== 'owner' && (
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => openEdit(u)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setDeleteTarget(u)} className="p-2 rounded-lg hover:bg-red-50 text-red-400">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden divide-y divide-gray-50">
-            {users.map(u => {
-              const RoleIcon = ROLE_ICONS[u.role]
-              return (
-                <div key={u.id} className="px-4 py-4 flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    {(u.name ?? '').charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${ROLE_COLORS[u.role]}`}>
-                        <RoleIcon className="w-3 h-3" />
-                        {ROLE_LABELS[u.role]}
-                      </span>
-                      <Badge variant="secondary" className={`text-[10px] ${u.status === 'active' ? 'bg-green-100 text-green-700' : ''}`}>
-                        {u.status === 'active' ? 'Aktif' : 'Nonaktif'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{u.email}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Login terakhir: {formatDate(u.lastLogin)}</p>
-                  </div>
-                  {u.role !== 'owner' && (
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => openEdit(u)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget(u)} className="p-2 rounded-lg hover:bg-red-50 text-red-400">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -526,7 +568,7 @@ export function TeamPage() {
       {/* Dialogs */}
       {dialogTarget !== null && (
         <UserDialog
-          user={dialogTarget === 'new' ? null : (dialogTarget as TeamUser)}
+          user={dialogTarget === 'new' ? null : (dialogTarget as ApiTeamUser)}
           onSave={handleSave}
           onClose={closeDialog}
           primaryColor={primaryColor}
@@ -538,6 +580,7 @@ export function TeamPage() {
           user={deleteTarget}
           onConfirm={() => handleDelete(deleteTarget)}
           onClose={() => setDeleteTarget(null)}
+          deleting={deleting}
         />
       )}
     </div>
