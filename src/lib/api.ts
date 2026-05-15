@@ -2,7 +2,7 @@
 // Import dari sini, bukan dari api-client.ts langsung.
 
 import { apiGet, apiPost, apiPut, apiDelete } from './api-client';
-import type { Product } from '../types/inventory';
+import type { Product, WarehouseLocation } from '../types/inventory';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES — Response shapes dari backend
@@ -176,6 +176,35 @@ export interface ApiVoucher {
   is_active?: boolean;
 }
 
+export interface ApiWarehouse {
+  id: string;
+  tenant_id?: string;
+  code: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  pic?: string | null;
+  phone?: string | null;
+  is_primary?: boolean;
+  active?: boolean;
+  stock_distribution?: Array<{ product_id: string | number; quantity: number }>;
+  created_at?: string;
+}
+
+export function mapApiWarehouse(w: ApiWarehouse): WarehouseLocation {
+  return {
+    id: w.id,
+    code: w.code,
+    name: w.name,
+    address: w.address ?? '',
+    city: w.city ?? '',
+    pic: w.pic ?? '',
+    phone: w.phone ?? '',
+    isPrimary: w.is_primary ?? false,
+    active: w.active ?? true,
+  };
+}
+
 export interface ApiInventoryRecord {
   id?: number | string;
   product_id: number | string;
@@ -311,11 +340,22 @@ export const resellersApi = {
   get: (id: string | number) => apiGet<ApiReseller>(`/api/resellers/${id}`),
   create: (data: Partial<ApiReseller>) => apiPost<ApiReseller>('/api/resellers', data),
   update: (id: string | number, data: Partial<ApiReseller>) => apiPut<ApiReseller>(`/api/resellers/${id}`, data),
+  remove: (id: string | number) => apiDelete(`/api/resellers/${id}`),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════════════════════════════════════
+
+export const warehousesApi = {
+  list: () => apiGet<ApiWarehouse[] | { data: ApiWarehouse[] }>('/api/warehouses').then(normalizeList<ApiWarehouse>),
+  get: (id: string) => apiGet<ApiWarehouse>(`/api/warehouses/${id}`),
+  create: (data: { code: string; name: string; address?: string | null; city?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean }) =>
+    apiPost<ApiWarehouse>('/api/warehouses', data),
+  update: (id: string, data: { name?: string; address?: string | null; city?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean; active?: boolean }) =>
+    apiPut<ApiWarehouse>(`/api/warehouses/${id}`, data),
+  remove: (id: string) => apiDelete(`/api/warehouses/${id}`),
+};
 
 export const inventoryApi = {
   list: () => apiGet<ApiInventoryRecord[] | { data: ApiInventoryRecord[] }>('/api/inventory').then(normalizeList<ApiInventoryRecord>),

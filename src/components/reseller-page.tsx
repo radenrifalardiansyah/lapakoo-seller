@@ -994,6 +994,7 @@ export function ResellerPage() {
   const handleDelete = () => {
     if (!deleteReseller) return
     setResellers(prev => prev.filter(r => r.id !== deleteReseller.id))
+    resellersApi.remove(deleteReseller.id).catch(() => {})
     setDeleteReseller(null)
   }
 

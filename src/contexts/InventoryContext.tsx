@@ -5,15 +5,15 @@ import {
 import type {
   Product, ProductStatus, WarehouseLocation, StockMovement,
 } from '../types/inventory'
-import { productsApi, inventoryApi, mapApiProduct } from '../lib/api'
+import { productsApi, warehousesApi, inventoryApi, mapApiProduct, mapApiWarehouse, type ApiWarehouse } from '../lib/api'
 
-// ─── Static warehouse data (API belum menyediakan endpoint /api/warehouses) ──
+// ─── Fallback jika API warehouse kosong ───────────────────────────────────────
 
 const DEFAULT_WAREHOUSES: WarehouseLocation[] = [
   {
     id: 'wh-1', code: 'GDG-01', name: 'Gudang Utama',
-    address: 'Alamat gudang belum diset', city: 'Jakarta',
-    pic: '-', phone: '-', isPrimary: true, active: true,
+    address: '', city: 'Jakarta',
+    pic: '', phone: '', isPrimary: true, active: true,
   },
 ]
 
@@ -72,19 +72,39 @@ function genId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 }
 
-function buildDistribution(
+function buildDistributionFromApi(
   products: Product[],
   warehouses: WarehouseLocation[],
+  apiWarehouses: ApiWarehouse[],
   stockMap: Record<number, number>,
 ): Record<number, Record<string, number>> {
   const primaryId = warehouses.find(w => w.isPrimary)?.id ?? warehouses[0]?.id ?? 'wh-1'
+
   const dist: Record<number, Record<string, number>> = {}
   products.forEach(p => {
     const perWh: Record<string, number> = {}
     warehouses.forEach(w => { perWh[w.id] = 0 })
-    perWh[primaryId] = stockMap[p.id] ?? 0
     dist[p.id] = perWh
   })
+
+  // Isi dari stock_distribution di setiap warehouse
+  apiWarehouses.forEach(w => {
+    (w.stock_distribution ?? []).forEach(sd => {
+      const pid = Number(sd.product_id)
+      if (dist[pid] && w.id in dist[pid]) {
+        dist[pid][w.id] = sd.quantity
+      }
+    })
+  })
+
+  // Fallback: jika belum ada stock_distribution, taruh di primary warehouse
+  products.forEach(p => {
+    const hasAny = Object.values(dist[p.id]).some(q => q > 0)
+    if (!hasAny && stockMap[p.id]) {
+      dist[p.id][primaryId] = stockMap[p.id]
+    }
+  })
+
   return dist
 }
 
@@ -104,49 +124,42 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     return warehouses.find(w => w.active)?.id ?? warehouses[0]?.id ?? null
   }, [warehouses])
 
-  const loadProducts = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [apiProducts, inventoryRecords] = await Promise.all([
+      const [apiProducts, apiWarehouses] = await Promise.all([
         productsApi.list(),
-        inventoryApi.list().catch(() => []),
+        warehousesApi.list().catch(() => [] as ApiWarehouse[]),
       ])
 
       const mapped = apiProducts.map(mapApiProduct)
+      const mappedWh = apiWarehouses.length > 0
+        ? apiWarehouses.map(mapApiWarehouse)
+        : DEFAULT_WAREHOUSES
 
-      // Build stock map dari inventory records, atau dari field stock di product
+      setWarehouses(mappedWh)
+
+      // Build stock map dari field stock di product
       const stockMap: Record<number, number> = {}
       apiProducts.forEach(p => {
         if (p.stock !== undefined) stockMap[Number(p.id)] = Number(p.stock)
       })
-      inventoryRecords.forEach(rec => {
-        const pid = Number(rec.product_id)
-        if (rec.quantity !== undefined) stockMap[pid] = (stockMap[pid] ?? 0) + Number(rec.quantity)
-        else if (rec.stock !== undefined) stockMap[pid] = Number(rec.stock)
-      })
+
+      const dist = buildDistributionFromApi(mapped, mappedWh, apiWarehouses, stockMap)
 
       setProducts(mapped)
-      setDistribution(prev => {
-        // Preserve local distribution overrides jika ada, merge dgn API data
-        const fresh = buildDistribution(mapped, warehouses, stockMap)
-        const merged: typeof fresh = {}
-        mapped.forEach(p => {
-          merged[p.id] = prev[p.id] ?? fresh[p.id]
-        })
-        return merged
-      })
+      setDistribution(dist)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat produk')
+      setError(err instanceof Error ? err.message : 'Gagal memuat data')
     } finally {
       setLoading(false)
     }
-  }, [warehouses])
+  }, [])
 
   useEffect(() => {
-    loadProducts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    loadData()
+  }, [loadData])
 
   // ── Selectors ──
   const totalStockOf = useCallback(
@@ -170,7 +183,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // ── Product CRUD ──
   const addProduct = useCallback(async (data: Omit<Product, 'id'>, initialStock: number) => {
-    const apiData = {
+    const created = await productsApi.create({
       name: data.name,
       category: data.category,
       price: data.price,
@@ -179,8 +192,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       weight: data.weight,
       description: data.description,
       stock: initialStock,
-    }
-    const created = await productsApi.create(apiData)
+    })
     const newProduct = mapApiProduct(created)
 
     setProducts(prev => [...prev, newProduct])
@@ -193,7 +205,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [warehouses, primaryWarehouseId])
 
   const updateProduct = useCallback(async (id: number, data: Omit<Product, 'id'>) => {
-    const apiData = {
+    const updated = await productsApi.update(id, {
       name: data.name,
       category: data.category,
       price: data.price,
@@ -201,8 +213,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       sku: data.sku,
       weight: data.weight,
       description: data.description,
-    }
-    const updated = await productsApi.update(id, apiData)
+    })
     const mapped = mapApiProduct(updated)
     setProducts(prev => prev.map(p => (p.id === id ? mapped : p)))
   }, [])
@@ -247,19 +258,51 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     [warehouses, primaryWarehouseId],
   )
 
-  // ── Warehouse CRUD (local only — API belum ada endpoint warehouses) ──
+  // ── Warehouse CRUD (optimistic + sync ke API) ──
   const addWarehouse = useCallback((data: Omit<WarehouseLocation, 'id'>) => {
-    const id = genId('wh')
+    const tempId = genId('wh')
     setWarehouses(prev => {
       const cleared = data.isPrimary ? prev.map(w => ({ ...w, isPrimary: false })) : prev
-      return [...cleared, { ...data, id }]
+      return [...cleared, { ...data, id: tempId }]
     })
     setDistribution(d => {
       const next: typeof d = {}
       Object.entries(d).forEach(([pid, perWh]) => {
-        next[Number(pid)] = { ...perWh, [id]: 0 }
+        next[Number(pid)] = { ...perWh, [tempId]: 0 }
       })
       return next
+    })
+
+    warehousesApi.create({
+      code: data.code,
+      name: data.name,
+      address: data.address || null,
+      city: data.city || null,
+      pic: data.pic || null,
+      phone: data.phone || null,
+      is_primary: data.isPrimary,
+    }).then(created => {
+      const realId = created.id
+      setWarehouses(prev => prev.map(w => w.id === tempId ? mapApiWarehouse(created) : w))
+      setDistribution(d => {
+        const next: typeof d = {}
+        Object.entries(d).forEach(([pid, perWh]) => {
+          const { [tempId]: qty, ...rest } = perWh
+          next[Number(pid)] = { ...rest, [realId]: qty ?? 0 }
+        })
+        return next
+      })
+    }).catch(() => {
+      // Rollback jika API gagal
+      setWarehouses(prev => prev.filter(w => w.id !== tempId))
+      setDistribution(d => {
+        const next: typeof d = {}
+        Object.entries(d).forEach(([pid, perWh]) => {
+          const { [tempId]: _, ...rest } = perWh
+          next[Number(pid)] = rest
+        })
+        return next
+      })
     })
   }, [])
 
@@ -269,6 +312,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       if (data.isPrimary) return { ...w, isPrimary: false }
       return w
     }))
+    warehousesApi.update(id, {
+      name: data.name,
+      address: data.address || null,
+      city: data.city || null,
+      pic: data.pic || null,
+      phone: data.phone || null,
+      is_primary: data.isPrimary,
+      active: data.active,
+    }).catch(() => {})
   }, [])
 
   const deleteWarehouse = useCallback((id: string) => {
@@ -281,6 +333,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       })
       return next
     })
+    warehousesApi.remove(id).catch(() => {})
   }, [])
 
   // ── Movement log ──
@@ -304,14 +357,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       warehouseId, warehouseName: wh?.name ?? '—',
       qty: Math.abs(delta), reason, by,
     })
-    // Sinkronisasi ke API (best-effort)
     inventoryApi.create({
       product_id: productId,
       warehouse_id: warehouseId,
       qty: Math.abs(delta),
       type: delta >= 0 ? 'adjustment_in' : 'adjustment_out',
       reason,
-    }).catch(() => { /* ignore — state lokal sudah diupdate */ })
+    }).catch(() => {})
   }, [products, warehouses, pushMovement])
 
   const transferStock = useCallback(({ fromId, toId, productId, qty, note = '', by = 'Admin' }: TransferInput) => {
@@ -345,7 +397,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const value: InventoryContextValue = {
     products, warehouses, movements, distribution,
-    loading, error, reload: loadProducts,
+    loading, error, reload: loadData,
     totalStockOf, stockAt, statusOf, distributionOf, primaryWarehouseId,
     addProduct, updateProduct, deleteProduct, bulkAddProducts,
     addWarehouse, updateWarehouse, deleteWarehouse,
