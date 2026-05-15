@@ -19,15 +19,14 @@ import { ForgotPasswordPage } from "./components/forgot-password-page";
 import { SettingsPage } from "./components/settings-page";
 import { ResellerPage } from "./components/reseller-page";
 import { MarketingPage } from "./components/marketing-page";
-import { ordersApi, resellersApi, vouchersApi } from "./lib/api";
+import { ordersApi, resellersApi, vouchersApi, notificationsApi } from "./lib/api";
 import { HelpPage } from "./components/help-page";
 import { TeamPage } from "./components/team-page";
+import { NotificationsPage } from "./components/notifications-page";
 import { LiveChat } from "./components/live-chat";
 import { UserProfileDialog } from "./components/user-profile-dialog";
 import { MobileHeader } from "./components/mobile-header";
 import { MobileBottomNav } from "./components/mobile-bottom-nav";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import {
   AlertDialog,
@@ -39,46 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./components/ui/alert-dialog";
-import { Bell, LogOut, Store, AlertTriangle, ChevronDown } from "lucide-react";
-
-function NotificationsPage() {
-  const { hasFeature } = useTenant();
-  const notifications = [
-    { color: "bg-blue-500", text: "Pesanan baru dari Ahmad Rizki", time: "5 menit yang lalu", badge: "Baru", variant: "default" as const, feature: null },
-    { color: "bg-orange-500", text: "Stok iPhone 14 Pro hampir habis", time: "2 jam yang lalu", badge: "Stok", variant: "outline" as const, feature: 'low-stock-alerts' as const },
-    { color: "bg-green-500", text: "Pembayaran Rp 15.999.000 berhasil", time: "1 hari yang lalu", badge: "Pembayaran", variant: "secondary" as const, feature: null },
-  ].filter(n => !n.feature || hasFeature(n.feature));
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Notifikasi</h1>
-        <p className="text-muted-foreground">Pantau semua notifikasi penting dari toko Anda</p>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="w-5 h-5" />
-            Notifikasi Terbaru
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {notifications.map((n, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
-                <div className={`w-2 h-2 ${n.color} rounded-full shrink-0`} />
-                <div className="flex-1">
-                  <p className="text-sm">{n.text}</p>
-                  <p className="text-xs text-muted-foreground">{n.time}</p>
-                </div>
-                <Badge variant={n.variant}>{n.badge}</Badge>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+import { LogOut, Store, AlertTriangle, ChevronDown } from "lucide-react";
 
 // ─── Loading & Error screens ──────────────────────────────────────────────────
 
@@ -125,9 +85,10 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [orderBadgeCount, setOrderBadgeCount] = useState(0);
-  const [resellerBadgeCount, setResellerBadgeCount] = useState(0);
-  const [marketingBadgeCount, setMarketingBadgeCount] = useState(0);
+  const [orderBadgeCount, setOrderBadgeCount]           = useState(0);
+  const [resellerBadgeCount, setResellerBadgeCount]     = useState(0);
+  const [marketingBadgeCount, setMarketingBadgeCount]   = useState(0);
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
 
   // Sinkronisasi tenant dengan sesi login — fetch store data setelah user login
   useEffect(() => {
@@ -156,6 +117,9 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
         const quota = Number(v.quota) || 0
         return isActive && end > now && start <= now && used < quota
       }).length)
+    }).catch(() => {})
+    notificationsApi.list().then(notifs => {
+      setNotificationBadgeCount(notifs.filter(n => n.status === 'unread' || n.is_read === false || n.read === false).length)
     }).catch(() => {})
   }, [user])
 
@@ -226,7 +190,7 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
       case "resellers":     return <ResellerPage />;
       case "marketing":     return <MarketingPage />;
       case "payments":      return <PaymentsPage />;
-      case "notifications": return <NotificationsPage />;
+      case "notifications": return <NotificationsPage onUnreadCountChange={setNotificationBadgeCount} />;
       case "settings":      return <SettingsPage />;
       case "help":          return <HelpPage onNavigate={setActiveTab} />;
       case "team":          return <TeamPage />;
@@ -234,12 +198,13 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
     }
   };
 
-  const productBadge   = hasFeature('low-stock-alerts')
+  const productBadge      = hasFeature('low-stock-alerts')
     ? products.filter(p => totalStockOf(p.id) <= 5).length
     : 0;
-  const orderBadge     = orderBadgeCount;
-  const resellerBadge  = resellerBadgeCount;
-  const marketingBadge = marketingBadgeCount;
+  const orderBadge        = orderBadgeCount;
+  const resellerBadge     = resellerBadgeCount;
+  const marketingBadge    = marketingBadgeCount;
+  const notificationBadge = notificationBadgeCount;
 
   const primaryColor = tenant?.primaryColor ?? '#6366f1';
 
@@ -253,11 +218,12 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
         orderBadge={orderBadge}
         resellerBadge={resellerBadge}
         marketingBadge={marketingBadge}
+        notificationBadge={notificationBadge}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <MobileHeader
           userEmail={userEmail}
-          hasNotifications={(orderBadge + productBadge + resellerBadge + marketingBadge) > 0}
+          hasNotifications={(orderBadge + productBadge + resellerBadge + marketingBadge + notificationBadge) > 0}
           onProfileClick={() => setShowProfile(true)}
           onNotificationsClick={() => setActiveTab('notifications')}
         />

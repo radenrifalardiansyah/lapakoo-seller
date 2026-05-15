@@ -21,6 +21,7 @@ interface SellerSidebarProps {
   orderBadge?: number
   resellerBadge?: number
   marketingBadge?: number
+  notificationBadge?: number
 }
 
 const mainNavItems: { id: FeatureKey; label: string; icon: ElementType }[] = [
@@ -45,7 +46,7 @@ const bottomNavItems: { id: FeatureKey; label: string; icon: ElementType }[] = [
 
 export function SellerSidebar({
   activeTab, onTabChange, onLogout,
-  productBadge, orderBadge, resellerBadge, marketingBadge,
+  productBadge, orderBadge, resellerBadge, marketingBadge, notificationBadge,
 }: SellerSidebarProps) {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
@@ -71,10 +72,11 @@ export function SellerSidebar({
   }
 
   const badgeFor = (id: string) => {
-    if (id === 'products'  && productBadge   && productBadge  > 0) return String(productBadge)
-    if (id === 'orders'    && orderBadge     && orderBadge    > 0) return String(orderBadge)
-    if (id === 'resellers' && resellerBadge  && resellerBadge > 0) return String(resellerBadge)
-    if (id === 'marketing' && marketingBadge && marketingBadge > 0) return String(marketingBadge)
+    if (id === 'products'      && productBadge      && productBadge      > 0) return String(productBadge)
+    if (id === 'orders'        && orderBadge        && orderBadge        > 0) return String(orderBadge)
+    if (id === 'resellers'     && resellerBadge     && resellerBadge     > 0) return String(resellerBadge)
+    if (id === 'marketing'     && marketingBadge    && marketingBadge    > 0) return String(marketingBadge)
+    if (id === 'notifications' && notificationBadge && notificationBadge > 0) return String(notificationBadge)
     return undefined
   }
 

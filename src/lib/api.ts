@@ -228,9 +228,11 @@ export interface ApiNotification {
   message?: string;
   body?: string;
   type?: string;
+  status?: 'unread' | 'read';
   is_read?: boolean;
   read?: boolean;
   created_at?: string;
+  read_at?: string | null;
 }
 
 export interface ApiTeamUser {
@@ -329,8 +331,17 @@ export const storeApi = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const notificationsApi = {
-  list: () => apiGet<ApiNotification[] | { data: ApiNotification[] }>('/api/notifications').then(normalizeList<ApiNotification>),
-  markRead: (id: number | string) => apiPut(`/api/notifications/${id}`, { is_read: true }),
+  list: (params?: { status?: string; type?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.type)   qs.set('type', params.type)
+    const q = qs.toString()
+    return apiGet<ApiNotification[] | { data: ApiNotification[] }>(
+      `/api/notifications${q ? `?${q}` : ''}`
+    ).then(normalizeList<ApiNotification>)
+  },
+  markRead:    (id: number | string) => apiPut(`/api/notifications/${id}`, {}),
+  markAllRead: () => apiPut('/api/notifications', {}),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
