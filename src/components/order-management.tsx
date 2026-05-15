@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { ordersApi, type ApiOrder } from '../lib/api'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
@@ -160,6 +161,47 @@ export const initialOrders: Order[] = [
     estimatedDelivery: '2024-01-19',
   },
 ]
+
+// ─── API → Local type mapper ──────────────────────────────────────────────────
+
+function mapApiOrder(o: ApiOrder): Order {
+  const rawItems = o.items ?? o.order_items ?? []
+  const items: OrderItem[] = rawItems.map(i => ({
+    name: i.product_name ?? i.name ?? '',
+    quantity: i.qty ?? i.quantity ?? 1,
+    price: Number(i.unit_price ?? i.price) || 0,
+  }))
+  const total = Number(o.total_amount ?? o.total) || items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const ret = o.return
+  return {
+    id: String(o.id),
+    customer: {
+      name: o.customer?.name ?? o.customer_name ?? 'Pelanggan',
+      email: o.customer?.email ?? o.customer_email ?? '',
+      phone: o.customer?.phone ?? o.customer_phone ?? '',
+    },
+    items,
+    total,
+    status: (o.status as OrderStatus) ?? 'pending',
+    paymentStatus: (o.payment_status as PaymentStatus) ?? 'waiting',
+    shippingAddress: o.shipping_address ?? '',
+    orderDate: o.created_at ?? o.order_date ?? new Date().toISOString(),
+    estimatedDelivery: o.estimated_delivery,
+    trackingNumber: o.tracking_number,
+    deliveryDate: o.delivered_at,
+    cancelReason: o.cancel_reason,
+    courier: o.courier,
+    returnRequest: ret
+      ? {
+          type: (ret.type as ReturType) ?? 'return_item',
+          reason: ret.reason ?? '',
+          notes: ret.notes ?? '',
+          requestDate: ret.request_date ?? new Date().toISOString(),
+          status: (ret.status as ReturStatus) ?? 'requested',
+        }
+      : undefined,
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1112,7 +1154,9 @@ function OrdersTable({
 
 export function OrderManagement() {
   const { hasFeature, tenant } = useTenant()
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [ordersError, setOrdersError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all')
 
@@ -1124,6 +1168,23 @@ export function OrderManagement() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
+
+  const loadOrders = useCallback(async () => {
+    setOrdersLoading(true)
+    setOrdersError(null)
+    try {
+      const data = await ordersApi.list()
+      setOrders(data.map(mapApiOrder))
+    } catch (err) {
+      setOrdersError(err instanceof Error ? err.message : 'Gagal memuat pesanan')
+      // Fallback ke mock data agar UI tetap berfungsi saat API belum live
+      setOrders(initialOrders)
+    } finally {
+      setOrdersLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadOrders() }, [loadOrders])
 
   const resetPage = () => setCurrentPage(1)
 
@@ -1173,18 +1234,16 @@ export function OrderManagement() {
 
   // ── handlers ──
   const handleUpdateStatus = (id: string, status: OrderStatus, extra?: { trackingNumber?: string; courier?: string }) => {
+    const patch = {
+      ...extra,
+      ...(status === 'delivered' ? { deliveryDate: new Date().toISOString() } : {}),
+    }
     setOrders(prev => prev.map(o =>
-      o.id === id
-        ? {
-            ...o,
-            status,
-            ...(extra?.trackingNumber ? { trackingNumber: extra.trackingNumber } : {}),
-            ...(extra?.courier ? { courier: extra.courier } : {}),
-            ...(status === 'delivered' ? { deliveryDate: new Date().toISOString() } : {}),
-          }
-        : o
+      o.id === id ? { ...o, status, ...patch } : o
     ))
-    setViewOrder(prev => prev?.id === id ? { ...prev!, status, ...(extra ?? {}), ...(status === 'delivered' ? { deliveryDate: new Date().toISOString() } : {}) } : prev)
+    setViewOrder(prev => prev?.id === id ? { ...prev!, status, ...patch } : prev)
+    // Sinkronisasi ke API (optimistic)
+    ordersApi.update(id, { status, tracking_number: extra?.trackingNumber, courier: extra?.courier }).catch(() => {})
   }
 
   const handleBulkShip = (updates: { id: string; courier: string; trackingNumber: string }[]) => {
@@ -1193,6 +1252,9 @@ export function OrderManagement() {
       if (!update) return o
       return { ...o, status: 'shipped' as OrderStatus, courier: update.courier, trackingNumber: update.trackingNumber }
     }))
+    updates.forEach(u =>
+      ordersApi.update(u.id, { status: 'shipped', courier: u.courier, tracking_number: u.trackingNumber }).catch(() => {})
+    )
     setSelectedIds(new Set())
     setBulkShipOrders([])
   }
@@ -1207,12 +1269,19 @@ export function OrderManagement() {
         cancelReason: reason,
       }
     }))
+    ids.forEach(id => ordersApi.update(id, { status: 'cancelled', cancel_reason: reason }).catch(() => {}))
     setSelectedIds(new Set())
     setCancelOrders([])
   }
 
   const handleReturRequest = (id: string, request: ReturnRequest) => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, returnRequest: request } : o))
+    ordersApi.createReturn(id, {
+      type: request.type,
+      reason: request.reason,
+      notes: request.notes,
+      status: request.status,
+    }).catch(() => {})
   }
 
   const handleReturStatusUpdate = (id: string, status: ReturStatus) => {
@@ -1226,6 +1295,7 @@ export function OrderManagement() {
         ? { ...prev, returnRequest: { ...prev.returnRequest, status } }
         : prev
     )
+    ordersApi.updateReturn(id, { status }).catch(() => {})
   }
 
   // ── export ──
@@ -1307,8 +1377,25 @@ export function OrderManagement() {
     { value: 'retur',      label: 'Retur',      count: stats.retur },
   ]
 
+  if (ordersLoading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        <div className="text-center space-y-2">
+          <ShoppingCart className="w-10 h-10 mx-auto animate-pulse" />
+          <p>Memuat pesanan...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {ordersError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700">
+          <span><AlertCircle className="w-4 h-4 inline mr-1.5" />Gagal terhubung ke server — menampilkan data contoh</span>
+          <Button variant="outline" size="sm" onClick={loadOrders}>Muat Ulang</Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>

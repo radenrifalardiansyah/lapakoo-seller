@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { apiRegister } from "../lib/auth-api";
+import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -12,6 +14,7 @@ interface RegisterPageProps {
 }
 
 export function RegisterPage({ onBackToLogin, onRegisterSuccess }: RegisterPageProps) {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -83,11 +86,34 @@ export function RegisterPage({ onBackToLogin, onRegisterSuccess }: RegisterPageP
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const res = await apiRegister({
+        name: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        store_name: formData.storeName,
+        store_address: formData.storeAddress,
+      });
+
+      if (!res.ok && 'error' in res) {
+        setError(res.error);
+        setIsLoading(false);
+        return;
+      }
+
+      // Simpan session dari response registrasi
+      const TOKEN_KEY = 'auth.token';
+      const EXPIRES_KEY = 'auth.expiresAt';
+      localStorage.setItem(TOKEN_KEY, res.session.token);
+      localStorage.setItem(EXPIRES_KEY, String(res.session.expiresAt));
+
       onRegisterSuccess(formData.email);
+    } catch {
+      setError("Gagal mendaftar. Coba lagi.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

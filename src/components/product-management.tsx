@@ -666,11 +666,13 @@ function ProductFormDialog({
   productId?: number
   open: boolean
   onClose: () => void
-  onSave: (data: Omit<Product, 'id'>, initialStock?: number) => void
+  onSave: (data: Omit<Product, 'id'>, initialStock?: number) => void | Promise<void>
   categories: string[]
 }) {
   const { warehouses, distributionOf, totalStockOf, primaryWarehouseId } = useInventory()
   const [form, setForm] = useState<Omit<Product, 'id'>>(initialData)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [rawNums, setRawNums] = useState({
     price: initialData.price > 0 ? String(initialData.price) : '',
@@ -708,15 +710,22 @@ function ProductFormDialog({
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.sku.trim() || !form.category) return
-    if (mode === 'add') {
-      const stock = Number(rawNums.stock) || 0
-      onSave(form, stock)
-    } else {
-      onSave(form)
+    setSaving(true)
+    setSaveError('')
+    try {
+      if (mode === 'add') {
+        await onSave(form, Number(rawNums.stock) || 0)
+      } else {
+        await onSave(form)
+      }
+      onClose()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Gagal menyimpan produk')
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   const handleOpenChange = (o: boolean) => {
@@ -897,9 +906,12 @@ function ProductFormDialog({
             <Button variant="outline" onClick={onClose}>
               <X className="w-4 h-4 mr-1.5" />Batal
             </Button>
-            <Button onClick={handleSave} disabled={!form.name.trim() || !form.sku.trim() || !form.category}>
+            {saveError && (
+              <p className="text-xs text-red-500">{saveError}</p>
+            )}
+            <Button onClick={handleSave} disabled={!form.name.trim() || !form.sku.trim() || !form.category || saving}>
               <Check className="w-4 h-4 mr-1.5" />
-              {mode === 'add' ? 'Simpan Produk' : 'Simpan Perubahan'}
+              {saving ? 'Menyimpan...' : mode === 'add' ? 'Simpan Produk' : 'Simpan Perubahan'}
             </Button>
           </div>
         </div>
@@ -919,6 +931,7 @@ export function ProductManagement({
   const {
     products, warehouses, totalStockOf, primaryWarehouseId,
     addProduct, updateProduct, deleteProduct, bulkAddProducts,
+    loading: inventoryLoading, error: inventoryError, reload,
   } = useInventory()
   const { hasFeature, tenant } = useTenant()
 
@@ -928,6 +941,7 @@ export function ProductManagement({
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
@@ -1040,8 +1054,25 @@ export function ProductManagement({
   }).length
   const outCount = products.filter(p => totalStockOf(p.id) === 0).length
 
+  if (inventoryLoading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        <div className="text-center space-y-2">
+          <Package className="w-10 h-10 mx-auto animate-pulse" />
+          <p>Memuat produk...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {inventoryError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span><AlertTriangle className="w-4 h-4 inline mr-1.5" />{inventoryError}</span>
+          <Button variant="outline" size="sm" onClick={reload}>Coba Lagi</Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
@@ -1355,15 +1386,23 @@ export function ProductManagement({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (deletingProduct) deleteProduct(deletingProduct.id)
-                setDeletingProduct(null)
+              onClick={async (e) => {
+                e.preventDefault()
+                if (!deletingProduct) return
+                setDeleting(true)
+                try {
+                  await deleteProduct(deletingProduct.id)
+                } catch { /* error handled in context */ } finally {
+                  setDeleting(false)
+                  setDeletingProduct(null)
+                }
               }}
               className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleting}
             >
-              Ya, Hapus
+              {deleting ? 'Menghapus...' : 'Ya, Hapus'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,91 +1,28 @@
 import {
-  createContext, useCallback, useContext, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useState,
   type ReactNode,
 } from 'react'
 import type {
   Product, ProductStatus, WarehouseLocation, StockMovement,
 } from '../types/inventory'
+import { productsApi, inventoryApi, mapApiProduct } from '../lib/api'
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
+// ─── Static warehouse data (API belum menyediakan endpoint /api/warehouses) ──
 
-const SEED_PRODUCTS: Product[] = [
+const DEFAULT_WAREHOUSES: WarehouseLocation[] = [
   {
-    id: 1, name: 'iPhone 14 Pro Max', category: 'Electronics', price: 15999000,
-    image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=200&h=200&fit=crop',
-    sku: 'IPH14PM-256-SG', weight: 240,
-    description: 'Smartphone flagship Apple dengan chip A16 Bionic, kamera 48MP, layar Super Retina XDR 6.7 inci.',
-  },
-  {
-    id: 2, name: 'Samsung Galaxy S23 Ultra', category: 'Electronics', price: 18999000,
-    image: 'https://images.unsplash.com/photo-1610792516307-ea5aabac2b31?w=200&h=200&fit=crop',
-    sku: 'SGS23U-512-BK', weight: 234,
-    description: 'Flagship Samsung dengan S Pen terintegrasi, kamera 200MP, dan baterai 5000mAh.',
-  },
-  {
-    id: 3, name: 'MacBook Air M2', category: 'Electronics', price: 18999000,
-    image: 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=200&h=200&fit=crop',
-    sku: 'MBA-M2-256-SG', weight: 1240,
-    description: 'Laptop tipis Apple dengan chip M2, layar Liquid Retina 13.6 inci, dan ketahanan baterai hingga 18 jam.',
-  },
-  {
-    id: 4, name: 'Nike Air Jordan 1', category: 'Fashion', price: 2499000,
-    image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=200&h=200&fit=crop',
-    sku: 'NAJ1-42-RED', weight: 500,
-    description: 'Sepatu basket ikonik Nike dengan desain retro klasik.',
-  },
-  {
-    id: 5, name: 'Adidas Ultraboost 22', category: 'Fashion', price: 2899000,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-    sku: 'AUB22-43-WHT', weight: 350,
-    description: 'Sepatu lari premium dengan teknologi Boost untuk kenyamanan maksimal.',
+    id: 'wh-1', code: 'GDG-01', name: 'Gudang Utama',
+    address: 'Alamat gudang belum diset', city: 'Jakarta',
+    pic: '-', phone: '-', isPrimary: true, active: true,
   },
 ]
-
-const SEED_INITIAL_STOCK: Record<number, number> = { 1: 25, 2: 15, 3: 8, 4: 3, 5: 0 }
-
-const SEED_WAREHOUSES: WarehouseLocation[] = [
-  {
-    id: 'wh-1', code: 'JKT-01', name: 'Gudang Jakarta Pusat',
-    address: 'Jl. Sudirman No. 25, Kel. Karet, Setiabudi',
-    city: 'Jakarta Pusat', pic: 'Andi Saputra', phone: '0812-1111-2222',
-    isPrimary: true, active: true,
-  },
-  {
-    id: 'wh-2', code: 'SBY-01', name: 'Gudang Surabaya',
-    address: 'Jl. Tunjungan No. 80',
-    city: 'Surabaya', pic: 'Lina Wijaya', phone: '0813-3333-4444',
-    isPrimary: false, active: true,
-  },
-]
-
-function buildSeedDistribution(): Record<number, Record<string, number>> {
-  const dist: Record<number, Record<string, number>> = {}
-  const primaryId = SEED_WAREHOUSES.find(w => w.isPrimary)?.id ?? SEED_WAREHOUSES[0].id
-  const otherIds = SEED_WAREHOUSES.filter(w => w.id !== primaryId).map(w => w.id)
-
-  SEED_PRODUCTS.forEach(p => {
-    const total = SEED_INITIAL_STOCK[p.id] ?? 0
-    const perWh: Record<string, number> = {}
-    SEED_WAREHOUSES.forEach(w => { perWh[w.id] = 0 })
-    const primaryShare = Math.round(total * 0.7)
-    perWh[primaryId] = primaryShare
-    let remaining = total - primaryShare
-    otherIds.forEach((id, idx) => {
-      const share = idx === otherIds.length - 1 ? remaining : Math.round(remaining / (otherIds.length - idx))
-      perWh[id] = share
-      remaining -= share
-    })
-    dist[p.id] = perWh
-  })
-  return dist
-}
 
 // ─── Context shape ────────────────────────────────────────────────────────────
 
 interface AdjustInput {
   warehouseId: string
   productId: number
-  delta: number   // positif = tambah, negatif = kurang
+  delta: number
   reason: string
   by?: string
 }
@@ -104,26 +41,25 @@ interface InventoryContextValue {
   warehouses: WarehouseLocation[]
   movements: StockMovement[]
   distribution: Record<number, Record<string, number>>
+  loading: boolean
+  error: string | null
+  reload: () => void
 
-  // selectors
   totalStockOf: (productId: number) => number
   stockAt: (productId: number, warehouseId: string) => number
   statusOf: (productId: number) => ProductStatus
   distributionOf: (productId: number) => Record<string, number>
   primaryWarehouseId: string | null
 
-  // product CRUD
-  addProduct: (data: Omit<Product, 'id'>, initialStock: number) => void
-  updateProduct: (id: number, data: Omit<Product, 'id'>) => void
-  deleteProduct: (id: number) => void
-  bulkAddProducts: (rows: Array<{ data: Omit<Product, 'id'>; initialStock: number }>) => void
+  addProduct: (data: Omit<Product, 'id'>, initialStock: number) => Promise<void>
+  updateProduct: (id: number, data: Omit<Product, 'id'>) => Promise<void>
+  deleteProduct: (id: number) => Promise<void>
+  bulkAddProducts: (rows: Array<{ data: Omit<Product, 'id'>; initialStock: number }>) => Promise<void>
 
-  // warehouse CRUD
   addWarehouse: (data: Omit<WarehouseLocation, 'id'>) => void
   updateWarehouse: (id: string, data: Omit<WarehouseLocation, 'id'>) => void
   deleteWarehouse: (id: string) => void
 
-  // stock operations
   adjustStock: (input: AdjustInput) => void
   transferStock: (input: TransferInput) => void
 }
@@ -136,29 +72,90 @@ function genId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 }
 
+function buildDistribution(
+  products: Product[],
+  warehouses: WarehouseLocation[],
+  stockMap: Record<number, number>,
+): Record<number, Record<string, number>> {
+  const primaryId = warehouses.find(w => w.isPrimary)?.id ?? warehouses[0]?.id ?? 'wh-1'
+  const dist: Record<number, Record<string, number>> = {}
+  products.forEach(p => {
+    const perWh: Record<string, number> = {}
+    warehouses.forEach(w => { perWh[w.id] = 0 })
+    perWh[primaryId] = stockMap[p.id] ?? 0
+    dist[p.id] = perWh
+  })
+  return dist
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS)
-  const [warehouses, setWarehouses] = useState<WarehouseLocation[]>(SEED_WAREHOUSES)
-  const [distribution, setDistribution] = useState<Record<number, Record<string, number>>>(buildSeedDistribution)
+  const [products, setProducts] = useState<Product[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseLocation[]>(DEFAULT_WAREHOUSES)
+  const [distribution, setDistribution] = useState<Record<number, Record<string, number>>>({})
   const [movements, setMovements] = useState<StockMovement[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const primaryWarehouseId = useMemo(() => {
     const primary = warehouses.find(w => w.isPrimary && w.active)
     if (primary) return primary.id
-    const anyActive = warehouses.find(w => w.active)
-    return anyActive?.id ?? warehouses[0]?.id ?? null
+    return warehouses.find(w => w.active)?.id ?? warehouses[0]?.id ?? null
   }, [warehouses])
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [apiProducts, inventoryRecords] = await Promise.all([
+        productsApi.list(),
+        inventoryApi.list().catch(() => []),
+      ])
+
+      const mapped = apiProducts.map(mapApiProduct)
+
+      // Build stock map dari inventory records, atau dari field stock di product
+      const stockMap: Record<number, number> = {}
+      apiProducts.forEach(p => {
+        if (p.stock !== undefined) stockMap[Number(p.id)] = Number(p.stock)
+      })
+      inventoryRecords.forEach(rec => {
+        const pid = Number(rec.product_id)
+        if (rec.quantity !== undefined) stockMap[pid] = (stockMap[pid] ?? 0) + Number(rec.quantity)
+        else if (rec.stock !== undefined) stockMap[pid] = Number(rec.stock)
+      })
+
+      setProducts(mapped)
+      setDistribution(prev => {
+        // Preserve local distribution overrides jika ada, merge dgn API data
+        const fresh = buildDistribution(mapped, warehouses, stockMap)
+        const merged: typeof fresh = {}
+        mapped.forEach(p => {
+          merged[p.id] = prev[p.id] ?? fresh[p.id]
+        })
+        return merged
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memuat produk')
+    } finally {
+      setLoading(false)
+    }
+  }, [warehouses])
+
+  useEffect(() => {
+    loadProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Selectors ──
   const totalStockOf = useCallback(
     (id: number) => Object.values(distribution[id] ?? {}).reduce((s, n) => s + n, 0),
-    [distribution]
+    [distribution],
   )
   const stockAt = useCallback(
     (id: number, whId: string) => distribution[id]?.[whId] ?? 0,
-    [distribution]
+    [distribution],
   )
   const statusOf = useCallback((id: number): ProductStatus => {
     const s = totalStockOf(id)
@@ -168,28 +165,50 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [totalStockOf])
   const distributionOf = useCallback(
     (id: number) => distribution[id] ?? {},
-    [distribution]
+    [distribution],
   )
 
   // ── Product CRUD ──
-  const addProduct = useCallback((data: Omit<Product, 'id'>, initialStock: number) => {
-    setProducts(prev => {
-      const newId = Math.max(0, ...prev.map(p => p.id)) + 1
-      setDistribution(d => {
-        const perWh: Record<string, number> = {}
-        warehouses.forEach(w => { perWh[w.id] = 0 })
-        if (primaryWarehouseId) perWh[primaryWarehouseId] = Math.max(0, initialStock)
-        return { ...d, [newId]: perWh }
-      })
-      return [...prev, { ...data, id: newId }]
+  const addProduct = useCallback(async (data: Omit<Product, 'id'>, initialStock: number) => {
+    const apiData = {
+      name: data.name,
+      category: data.category,
+      price: data.price,
+      image: data.image,
+      sku: data.sku,
+      weight: data.weight,
+      description: data.description,
+      stock: initialStock,
+    }
+    const created = await productsApi.create(apiData)
+    const newProduct = mapApiProduct(created)
+
+    setProducts(prev => [...prev, newProduct])
+    setDistribution(d => {
+      const perWh: Record<string, number> = {}
+      warehouses.forEach(w => { perWh[w.id] = 0 })
+      if (primaryWarehouseId) perWh[primaryWarehouseId] = Math.max(0, initialStock)
+      return { ...d, [newProduct.id]: perWh }
     })
   }, [warehouses, primaryWarehouseId])
 
-  const updateProduct = useCallback((id: number, data: Omit<Product, 'id'>) => {
-    setProducts(prev => prev.map(p => (p.id === id ? { ...p, ...data, id: p.id } : p)))
+  const updateProduct = useCallback(async (id: number, data: Omit<Product, 'id'>) => {
+    const apiData = {
+      name: data.name,
+      category: data.category,
+      price: data.price,
+      image: data.image,
+      sku: data.sku,
+      weight: data.weight,
+      description: data.description,
+    }
+    const updated = await productsApi.update(id, apiData)
+    const mapped = mapApiProduct(updated)
+    setProducts(prev => prev.map(p => (p.id === id ? mapped : p)))
   }, [])
 
-  const deleteProduct = useCallback((id: number) => {
+  const deleteProduct = useCallback(async (id: number) => {
+    await productsApi.remove(id)
     setProducts(prev => prev.filter(p => p.id !== id))
     setDistribution(d => {
       const next = { ...d }
@@ -199,27 +218,36 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const bulkAddProducts = useCallback(
-    (rows: Array<{ data: Omit<Product, 'id'>; initialStock: number }>) => {
-      setProducts(prev => {
-        let nextId = Math.max(0, ...prev.map(p => p.id)) + 1
-        const items = rows.map(r => ({ ...r.data, id: nextId++ }))
-        setDistribution(d => {
-          const next = { ...d }
-          items.forEach((p, idx) => {
-            const perWh: Record<string, number> = {}
-            warehouses.forEach(w => { perWh[w.id] = 0 })
-            if (primaryWarehouseId) perWh[primaryWarehouseId] = Math.max(0, rows[idx].initialStock)
-            next[p.id] = perWh
-          })
-          return next
+    async (rows: Array<{ data: Omit<Product, 'id'>; initialStock: number }>) => {
+      const created = await Promise.all(
+        rows.map(r => productsApi.create({
+          name: r.data.name,
+          category: r.data.category,
+          price: r.data.price,
+          image: r.data.image,
+          sku: r.data.sku,
+          weight: r.data.weight,
+          description: r.data.description,
+          stock: r.initialStock,
+        })),
+      )
+      const newProducts = created.map(mapApiProduct)
+      setProducts(prev => [...prev, ...newProducts])
+      setDistribution(d => {
+        const next = { ...d }
+        newProducts.forEach((p, idx) => {
+          const perWh: Record<string, number> = {}
+          warehouses.forEach(w => { perWh[w.id] = 0 })
+          if (primaryWarehouseId) perWh[primaryWarehouseId] = Math.max(0, rows[idx].initialStock)
+          next[p.id] = perWh
         })
-        return [...prev, ...items]
+        return next
       })
     },
-    [warehouses, primaryWarehouseId]
+    [warehouses, primaryWarehouseId],
   )
 
-  // ── Warehouse CRUD ──
+  // ── Warehouse CRUD (local only — API belum ada endpoint warehouses) ──
   const addWarehouse = useCallback((data: Omit<WarehouseLocation, 'id'>) => {
     const id = genId('wh')
     setWarehouses(prev => {
@@ -257,12 +285,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // ── Movement log ──
   const pushMovement = useCallback((m: Omit<StockMovement, 'id' | 'date'>) => {
-    setMovements(prev => [{
-      ...m, id: genId('mv'), date: new Date().toISOString(),
-    }, ...prev])
+    setMovements(prev => [{ ...m, id: genId('mv'), date: new Date().toISOString() }, ...prev])
   }, [])
 
-  // ── Stock operations ──
+  // ── Stock operations (local update + API inventory record) ──
   const adjustStock = useCallback(({ warehouseId, productId, delta, reason, by = 'Admin' }: AdjustInput) => {
     setDistribution(d => {
       const next = { ...d }
@@ -278,6 +304,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       warehouseId, warehouseName: wh?.name ?? '—',
       qty: Math.abs(delta), reason, by,
     })
+    // Sinkronisasi ke API (best-effort)
+    inventoryApi.create({
+      product_id: productId,
+      warehouse_id: warehouseId,
+      quantity: delta,
+      type: delta >= 0 ? 'adjustment_in' : 'adjustment_out',
+      reason,
+    }).catch(() => { /* ignore — state lokal sudah diupdate */ })
   }, [products, warehouses, pushMovement])
 
   const transferStock = useCallback(({ fromId, toId, productId, qty, note = '', by = 'Admin' }: TransferInput) => {
@@ -311,6 +345,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const value: InventoryContextValue = {
     products, warehouses, movements, distribution,
+    loading, error, reload: loadProducts,
     totalStockOf, stockAt, statusOf, distributionOf, primaryWarehouseId,
     addProduct, updateProduct, deleteProduct, bulkAddProducts,
     addWarehouse, updateWarehouse, deleteWarehouse,

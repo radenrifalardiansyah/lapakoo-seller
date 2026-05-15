@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { resellersApi, type ApiReseller } from '../lib/api'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
@@ -834,11 +835,35 @@ function PayCommissionDialog({
   )
 }
 
+// ─── API → Local type mapper ──────────────────────────────────────────────────
+
+function mapApiReseller(r: ApiReseller): Reseller {
+  return {
+    id: String(r.id),
+    name: r.name,
+    email: r.email ?? '',
+    phone: r.phone ?? '',
+    city: r.city ?? '',
+    address: r.address ?? '',
+    tier: (r.tier as ResellerTier) ?? 'Bronze',
+    status: (r.status as ResellerStatus) ?? 'pending',
+    joinDate: r.join_date ?? r.created_at?.slice(0, 10) ?? '',
+    totalSales: Number(r.total_sales) || 0,
+    totalOrders: Number(r.total_orders) || 0,
+    pendingCommission: Number(r.pending_commission) || 0,
+    paidCommission: Number(r.paid_commission) || 0,
+    referralCode: r.referral_code ?? '',
+    notes: r.notes,
+  }
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ResellerPage() {
   const { hasFeature, tenant } = useTenant()
-  const [resellers, setResellers]         = useState<Reseller[]>(initialResellers)
+  const [resellers, setResellers]         = useState<Reseller[]>([])
+  const [resellersLoading, setResellersLoading] = useState(true)
+  const [resellersError, setResellersError] = useState<string | null>(null)
   const [tierSettings, setTierSettings]   = useState<Record<ResellerTier, TierBusinessConfig>>(DEFAULT_TIER_SETTINGS)
   const [searchTerm, setSearchTerm]       = useState('')
   const [tierFilter, setTierFilter]       = useState<string>('all')
@@ -856,6 +881,22 @@ export function ResellerPage() {
   const [deleteReseller, setDeleteReseller]     = useState<Reseller | null>(null)
   const [isAddOpen, setIsAddOpen]               = useState(false)
   const [isTierSettingsOpen, setIsTierSettingsOpen] = useState(false)
+
+  const loadResellers = useCallback(async () => {
+    setResellersLoading(true)
+    setResellersError(null)
+    try {
+      const data = await resellersApi.list()
+      setResellers(data.map(mapApiReseller))
+    } catch (err) {
+      setResellersError(err instanceof Error ? err.message : 'Gagal memuat reseller')
+      setResellers(initialResellers)
+    } finally {
+      setResellersLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadResellers() }, [loadResellers])
 
   const resetPage = () => setCurrentPage(1)
 
@@ -889,19 +930,31 @@ export function ResellerPage() {
 
   // ── handlers ──
   const handleAdd = (data: ResellerForm) => {
-    const id = `RSL-${String(resellers.length + 1).padStart(3, '0')}`
-    setResellers(prev => [...prev, {
-      id, ...data, status: 'pending',
-      joinDate: new Date().toISOString().slice(0, 10),
-      totalSales: 0, totalOrders: 0,
-      pendingCommission: 0, paidCommission: 0,
-      referralCode: '',
-    }])
+    resellersApi.create({
+      name: data.name, email: data.email, phone: data.phone,
+      city: data.city, address: data.address, notes: data.notes,
+      status: 'pending', tier: data.tier,
+    }).then(created => {
+      setResellers(prev => [...prev, mapApiReseller(created)])
+    }).catch(() => {
+      // Fallback lokal
+      const id = `RSL-${String(resellers.length + 1).padStart(3, '0')}`
+      setResellers(prev => [...prev, {
+        id, ...data, status: 'pending',
+        joinDate: new Date().toISOString().slice(0, 10),
+        totalSales: 0, totalOrders: 0,
+        pendingCommission: 0, paidCommission: 0, referralCode: '',
+      }])
+    })
   }
 
   const handleEdit = (data: ResellerForm) => {
     if (!editReseller) return
     setResellers(prev => prev.map(r => r.id === editReseller.id ? { ...r, ...data } : r))
+    resellersApi.update(editReseller.id, {
+      name: data.name, email: data.email, phone: data.phone,
+      city: data.city, address: data.address, notes: data.notes, tier: data.tier,
+    }).catch(() => {})
   }
 
   const handleApprove = (id: string, tier: ResellerTier) => {
@@ -909,26 +962,33 @@ export function ResellerPage() {
     setResellers(prev => prev.map(r =>
       r.id === id ? { ...r, status: 'active', tier, referralCode: ref } : r
     ))
+    resellersApi.update(id, { status: 'active', tier, referral_code: ref }).catch(() => {})
   }
 
   const handleSuspend = () => {
     if (!suspendReseller) return
     setResellers(prev => prev.map(r => r.id === suspendReseller.id ? { ...r, status: 'suspended' } : r))
+    resellersApi.update(suspendReseller.id, { status: 'suspended' }).catch(() => {})
     setSuspendReseller(null)
   }
 
   const handleActivate = () => {
     if (!activateReseller) return
     setResellers(prev => prev.map(r => r.id === activateReseller.id ? { ...r, status: 'active' } : r))
+    resellersApi.update(activateReseller.id, { status: 'active' }).catch(() => {})
     setActivateReseller(null)
   }
 
   const handlePayCommission = (id: string) => {
-    setResellers(prev => prev.map(r =>
-      r.id === id
-        ? { ...r, paidCommission: r.paidCommission + r.pendingCommission, pendingCommission: 0 }
-        : r
+    const r = resellers.find(x => x.id === id)
+    if (!r) return
+    setResellers(prev => prev.map(x =>
+      x.id === id ? { ...x, paidCommission: x.paidCommission + x.pendingCommission, pendingCommission: 0 } : x
     ))
+    resellersApi.update(id, {
+      paid_commission: r.paidCommission + r.pendingCommission,
+      pending_commission: 0,
+    }).catch(() => {})
   }
 
   const handleDelete = () => {
@@ -1016,8 +1076,25 @@ export function ResellerPage() {
     { value: 'suspended', label: 'Disuspend', count: stats.suspended },
   ]
 
+  if (resellersLoading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        <div className="text-center space-y-2">
+          <Handshake className="w-10 h-10 mx-auto animate-pulse" />
+          <p>Memuat reseller...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {resellersError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700">
+          <span>Gagal terhubung ke server — menampilkan data contoh</span>
+          <Button variant="outline" size="sm" onClick={loadResellers}>Muat Ulang</Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>

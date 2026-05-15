@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { storeApi, type ApiStoreStats } from '../lib/api'
 import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
@@ -148,9 +149,65 @@ function PriceTooltip({ active, payload, label }: any) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+function formatRp(val: number): string {
+  if (val >= 1_000_000_000) return `Rp ${(val / 1_000_000_000).toFixed(1)} M`
+  if (val >= 1_000_000) return `Rp ${(val / 1_000_000).toFixed(0)} Jt`
+  return `Rp ${val.toLocaleString('id-ID')}`
+}
+
 export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProduct?: () => void; onViewAllOrders?: () => void } = {}) {
   const { tenant } = useTenant()
   const isStarter = tenant?.package.id === 'starter'
+
+  const [stats, setStats] = useState<ApiStoreStats | null>(null)
+
+  useEffect(() => {
+    storeApi.stats().then(setStats).catch(() => { /* use mock fallback */ })
+  }, [])
+
+  // Merge API stats into businessSummary
+  const liveSummary = stats ? [
+    {
+      label: 'Pendapatan Bulan Ini',
+      value: formatRp(Number(stats.revenue_this_month ?? stats.revenue ?? 0)),
+      prev: '-', pct: '', up: true, icon: Banknote, color: 'text-green-500',
+    },
+    {
+      label: 'Total Pesanan',
+      value: String(stats.orders_this_month ?? stats.total_orders ?? 0),
+      prev: '-', pct: '', up: true, icon: ShoppingCart, color: 'text-blue-500',
+    },
+    {
+      label: 'Pelanggan Baru',
+      value: String(stats.new_customers_this_month ?? stats.new_customers ?? 0),
+      prev: '-', pct: '', up: true, icon: Users, color: 'text-purple-500',
+    },
+    {
+      label: 'Rata-rata Nilai Pesan',
+      value: formatRp(Number(stats.average_order_value ?? 0)),
+      prev: '-', pct: '', up: true, icon: Target, color: 'text-orange-500',
+    },
+  ] : businessSummary
+
+  const liveSalesData = stats?.sales_chart
+    ? stats.sales_chart.map(d => ({ bulan: d.month, penjualan: d.sales, pesanan: d.orders }))
+    : salesData
+
+  const liveCategoryData = stats?.category_chart
+    ? stats.category_chart.map((d, i) => ({ nama: d.name, nilai: d.value, color: categoryData[i]?.color ?? '#6366f1' }))
+    : categoryData
+
+  const liveRecentOrders = stats?.recent_orders
+    ? stats.recent_orders.slice(0, 4).map(o => ({
+        id: String(o.id),
+        customer: o.customer?.name ?? o.customer_name ?? 'Pelanggan',
+        product: (o.items ?? o.order_items ?? [])[0]?.product_name
+          ?? (o.items ?? o.order_items ?? [])[0]?.name ?? 'Produk',
+        amount: Number(o.total_amount ?? o.total) || 0,
+        status: o.status ?? 'pending',
+        date: o.created_at ? new Date(o.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+      }))
+    : recentOrders
 
   // Announcements
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
@@ -206,7 +263,7 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
         <CardContent className="space-y-5">
           {/* KPI grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {businessSummary.map((item, i) => {
+            {liveSummary.map((item, i) => {
               const Icon = item.icon
               return (
                 <div key={i} className="p-4 rounded-xl border bg-muted/20 space-y-2 min-w-0">
@@ -263,7 +320,7 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
           <CardHeader><CardTitle>Grafik Penjualan Bulanan</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={salesData}>
+              <BarChart data={liveSalesData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="bulan" />
                 <YAxis tickFormatter={formatShort} width={55} />
@@ -279,14 +336,14 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="nilai">
-                  {categoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                <Pie data={liveCategoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={4} dataKey="nilai">
+                  {liveCategoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
                 <Tooltip formatter={(v: number) => [`${v}%`, 'Porsi']} />
               </PieChart>
             </ResponsiveContainer>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3">
-              {categoryData.map((item, i) => (
+              {liveCategoryData.map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                   <span className="text-muted-foreground flex-1">{item.nama}</span>
@@ -310,10 +367,10 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
         </CardHeader>
         <CardContent>
           <div className="space-y-0">
-            {recentOrders.map((order, i) => {
+            {liveRecentOrders.map((order, i) => {
               const s = STATUS_MAP[order.status] ?? { label: order.status, class: 'bg-muted text-muted-foreground border-muted' }
               return (
-                <div key={order.id} className={`flex items-center gap-4 py-3 ${i < recentOrders.length - 1 ? 'border-b' : ''}`}>
+                <div key={order.id} className={`flex items-center gap-4 py-3 ${i < liveRecentOrders.length - 1 ? 'border-b' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-sm font-medium">{order.id}</p>
                     <TruncatedText className="text-xs text-muted-foreground truncate">{order.customer}</TruncatedText>

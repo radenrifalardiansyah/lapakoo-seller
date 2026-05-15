@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { storeApi, type ApiStore } from "../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -128,6 +129,22 @@ const MOCK_SESSIONS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+function mapApiStore(s: ApiStore): StoreInfo {
+  return {
+    storeName: s.store_name ?? s.name ?? defaultStoreInfo.storeName,
+    description: s.description ?? defaultStoreInfo.description,
+    address: s.address ?? defaultStoreInfo.address,
+    city: s.city ?? defaultStoreInfo.city,
+    province: s.province ?? defaultStoreInfo.province,
+    postalCode: s.postal_code ?? defaultStoreInfo.postalCode,
+    phone: s.phone ?? defaultStoreInfo.phone,
+    email: s.email ?? defaultStoreInfo.email,
+    website: s.website ?? defaultStoreInfo.website,
+    operationalHours: s.operational_hours ?? defaultStoreInfo.operationalHours,
+    logo: s.logo_url ?? s.logo ?? defaultStoreInfo.logo,
+  }
+}
+
 export function SettingsPage() {
   const { hasFeature } = useTenant();
 
@@ -136,7 +153,17 @@ export function SettingsPage() {
   const [formData, setFormData]     = useState<StoreInfo>(defaultStoreInfo);
   const [isEditing, setIsEditing]   = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savingStore, setSavingStore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load store data dari API on mount
+  useEffect(() => {
+    storeApi.get().then(apiStore => {
+      const mapped = mapApiStore(apiStore)
+      setStoreInfo(mapped)
+      setFormData(mapped)
+    }).catch(() => { /* gunakan default */ })
+  }, []);
 
   // ── Notifikasi ──
   const [notifications, setNotifications] = useState<NotificationSettings>(defaultNotifications);
@@ -172,7 +199,28 @@ export function SettingsPage() {
   // ── Profil handlers ──
   const handleEditStart = () => { setFormData({ ...storeInfo }); setIsEditing(true); setSaveSuccess(false); };
   const handleCancel    = () => { setFormData({ ...storeInfo }); setIsEditing(false); };
-  const handleSave      = () => {
+  const handleSave      = async () => {
+    setSavingStore(true)
+    try {
+      const payload: ApiStore = {
+        store_name: formData.storeName,
+        description: formData.description,
+        address: formData.address,
+        city: formData.city,
+        province: formData.province,
+        postal_code: formData.postalCode,
+        phone: formData.phone,
+        email: formData.email,
+        website: formData.website,
+        operational_hours: formData.operationalHours,
+        logo_url: formData.logo ?? undefined,
+      }
+      await storeApi.update(payload)
+    } catch {
+      // Simpan lokal meskipun API gagal
+    } finally {
+      setSavingStore(false)
+    }
     setStoreInfo({ ...formData }); setIsEditing(false); setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -257,8 +305,8 @@ export function SettingsPage() {
                 <Button size="sm" variant="outline" onClick={handleCancel}>
                   <X className="w-4 h-4 mr-1.5" />Batal
                 </Button>
-                <Button size="sm" onClick={handleSave}>
-                  <Check className="w-4 h-4 mr-1.5" />Simpan
+                <Button size="sm" onClick={handleSave} disabled={savingStore}>
+                  <Check className="w-4 h-4 mr-1.5" />{savingStore ? 'Menyimpan...' : 'Simpan'}
                 </Button>
               </div>
             )}
@@ -327,7 +375,7 @@ export function SettingsPage() {
           {isEditing && (
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={handleCancel}><X className="w-4 h-4 mr-2" />Batal</Button>
-              <Button onClick={handleSave}><Check className="w-4 h-4 mr-2" />Simpan Perubahan</Button>
+              <Button onClick={handleSave} disabled={savingStore}><Check className="w-4 h-4 mr-2" />{savingStore ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
             </div>
           )}
         </CardContent>

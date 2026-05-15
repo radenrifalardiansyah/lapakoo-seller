@@ -1,113 +1,121 @@
 // ──────────────────────────────────────────────────────────────────────────────
 // AUTH API LAYER
 //
-// File ini adalah satu-satunya boundary antara frontend dan backend auth.
-// Ketika backend siap, ganti isi tiap fungsi di bawah ini dengan fetch() —
-// bentuk return value (Promise<...>) sudah dirancang sesuai pola JWT bearer:
-//
-//   apiLogin   -> POST   /api/auth/login    { email, password } -> { token, user, expiresAt }
-//   apiLogout  -> POST   /api/auth/logout   (Authorization: Bearer <token>)
-//   apiMe      -> GET    /api/auth/me       (Authorization: Bearer <token>) -> user
-//
+// Satu-satunya boundary antara frontend dan backend auth.
+// Semua request ke /api/auth/* lewat sini.
 // Komponen UI TIDAK boleh import file ini langsung — semua akses lewat AuthContext.
 // ──────────────────────────────────────────────────────────────────────────────
 
 import type { AuthSession, AuthUser, LoginResponse } from '../types/auth';
+import { apiPost, apiGet, ApiError } from './api-client';
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8; // 8 hours
 
-// ─── Mock user database ───────────────────────────────────────────────────────
-// Email & nama selaras dengan mock di team-page.tsx (tenant: tokobudi).
+// ─── Response shapes dari backend ─────────────────────────────────────────────
 
-interface MockRecord {
-  password: string;
-  user: AuthUser;
+interface LoginApiResponse {
+  token: string;
+  user: {
+    id: string | number;
+    email: string;
+    name: string;
+    role?: string;
+    store_id?: string | number;
+    avatar?: string;
+    avatar_url?: string;
+  };
+  expires_at?: number;
 }
 
-const MOCK_DB: MockRecord[] = [
-  {
-    password: 'demo123',
-    user: {
-      id: 'u_1',
-      email: 'budi@tokobudi.seller.id',
-      name: 'Budi Santoso',
-      role: 'owner',
-      tenantId: '2',
-    },
-  },
-  {
-    password: 'demo123',
-    user: {
-      id: 'u_2',
-      email: 'siti@tokobudi.seller.id',
-      name: 'Siti Rahayu',
-      role: 'admin',
-      tenantId: '2',
-    },
-  },
-  {
-    password: 'demo123',
-    user: {
-      id: 'u_3',
-      email: 'doni@tokobudi.seller.id',
-      name: 'Doni Prasetyo',
-      role: 'staff',
-      tenantId: '2',
-    },
-  },
-  // Legacy single-credential fallback so existing demo links tetap jalan.
-  {
-    password: 'password123',
-    user: {
-      id: 'u_legacy',
-      email: 'seller@example.com',
-      name: 'Demo Seller',
-      role: 'owner',
-      tenantId: '0',
-    },
-  },
-];
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+interface MeApiResponse {
+  id: string | number;
+  email: string;
+  name: string;
+  role?: string;
+  store_id?: string | number;
+  avatar?: string;
+  avatar_url?: string;
 }
 
-function buildToken(userId: string): string {
-  // Mock token. Backend nyata akan return JWT signed (header.payload.signature).
-  // Shape sengaja mirip "mock.<userId>.<issuedAt>" agar mudah dikenali.
-  return `mock.${userId}.${Date.now()}`;
+function mapUser(raw: LoginApiResponse['user'] | MeApiResponse): AuthUser {
+  return {
+    id: String(raw.id),
+    email: raw.email,
+    name: raw.name,
+    role: (raw.role as AuthUser['role']) ?? 'staff',
+    tenantId: String(raw.store_id ?? '0'),
+    avatarUrl: raw.avatar_url ?? raw.avatar,
+  };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function apiLogin(email: string, password: string): Promise<LoginResponse> {
-  await sleep(700); // simulate network
-
-  const normalized = email.trim().toLowerCase();
-  const record = MOCK_DB.find(r => r.user.email.toLowerCase() === normalized);
-
-  if (!record || record.password !== password) {
-    return { ok: false, error: 'Email atau password salah' };
+  try {
+    const res = await apiPost<LoginApiResponse>('/api/auth/login', { email, password }, { skipAuth: true });
+    const user = mapUser(res.user);
+    const session: AuthSession = {
+      token: res.token,
+      user,
+      expiresAt: res.expires_at ?? (Date.now() + SESSION_TTL_MS),
+    };
+    return { ok: true, session };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.status === 401 || err.status === 422) {
+        return { ok: false, error: 'Email atau password salah' };
+      }
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Gagal terhubung ke server. Coba lagi.' };
   }
-
-  const session: AuthSession = {
-    token: buildToken(record.user.id),
-    user: record.user,
-    expiresAt: Date.now() + SESSION_TTL_MS,
-  };
-  return { ok: true, session };
 }
 
-export async function apiLogout(_token: string): Promise<void> {
-  await sleep(150);
-  // Backend nyata: invalidate token / clear cookie. Mock: no-op.
+export async function apiLogout(token: string): Promise<void> {
+  try {
+    await apiPost('/api/auth/logout', undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+      skipAuth: true,
+    });
+  } catch {
+    // Abaikan error logout — session sudah dihapus di sisi client
+  }
 }
 
 export async function apiMe(token: string): Promise<AuthUser | null> {
-  await sleep(150);
-  // Decode mock token "mock.<userId>.<issuedAt>" to lookup user.
-  const parts = token.split('.');
-  if (parts[0] !== 'mock' || parts.length < 3) return null;
-  const userId = parts[1];
-  return MOCK_DB.find(r => r.user.id === userId)?.user ?? null;
+  try {
+    const res = await apiGet<MeApiResponse>('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+      skipAuth: true,
+    });
+    return mapUser(res);
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRegister(data: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  store_name?: string;
+  store_address?: string;
+}): Promise<{ ok: true; session: AuthSession } | { ok: false; error: string }> {
+  try {
+    const res = await apiPost<LoginApiResponse>('/api/auth/register', data, { skipAuth: true });
+    const user = mapUser(res.user);
+    const session: AuthSession = {
+      token: res.token,
+      user,
+      expiresAt: res.expires_at ?? (Date.now() + SESSION_TTL_MS),
+    };
+    return { ok: true, session };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.status === 422) return { ok: false, error: 'Email sudah terdaftar atau data tidak valid' };
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Gagal mendaftar. Coba lagi.' };
+  }
 }

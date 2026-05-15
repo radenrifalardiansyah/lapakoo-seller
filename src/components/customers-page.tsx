@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
+import { customersApi, type ApiCustomer } from '../lib/api'
 import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
@@ -488,6 +489,40 @@ const PERIOD_OPTS: Array<{ value: PeriodFilter; label: string; days: number | nu
   { value: 'all', label: 'Semua periode',   days: null },
 ]
 
+// ─── API → Local type mapper ──────────────────────────────────────────────────
+
+function deriveSegment(totalOrders: number, totalSpend: number): Segment {
+  if (totalSpend >= 10000000 || totalOrders >= 20) return 'VIP'
+  if (totalOrders >= 2) return 'Regular'
+  return 'New'
+}
+
+function mapApiCustomer(c: ApiCustomer): Customer {
+  const totalOrders = Number(c.total_orders) || 0
+  const totalSpend = Number(c.total_spend) || 0
+  return {
+    id: Number(c.id),
+    name: c.name,
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    address: c.address ?? '',
+    segment: (c.segment as Segment) ?? deriveSegment(totalOrders, totalSpend),
+    totalOrders,
+    totalSpend,
+    lastOrder: c.last_order ?? c.last_order_date ?? '',
+    joinDate: c.join_date ?? c.created_at ?? '',
+    orders: (c.orders ?? []).map(o => ({
+      id: String(o.id),
+      product: (o.items ?? o.order_items ?? [])[0]?.product_name
+        ?? (o.items ?? o.order_items ?? [])[0]?.name
+        ?? '-',
+      amount: Number(o.total_amount ?? o.total) || 0,
+      date: o.created_at ?? o.order_date ?? '',
+      status: o.status as OrderStatus | undefined,
+    })),
+  }
+}
+
 function CustomerHistoryDialog({
   customer,
   open,
@@ -795,6 +830,9 @@ function CustomerHistoryDialog({
 
 export function CustomersPage() {
   const { hasFeature, tenant } = useTenant()
+  const [customerList, setCustomerList] = useState<Customer[]>(customers)
+  const [customersLoading, setCustomersLoading] = useState(true)
+  const [customersError, setCustomersError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<'all' | Segment>('all')
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null)
@@ -802,8 +840,24 @@ export function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  const loadCustomers = useCallback(async () => {
+    setCustomersLoading(true)
+    setCustomersError(null)
+    try {
+      const data = await customersApi.list()
+      setCustomerList(data.map(mapApiCustomer))
+    } catch (err) {
+      setCustomersError(err instanceof Error ? err.message : 'Gagal memuat pelanggan')
+      setCustomerList(customers) // fallback ke mock
+    } finally {
+      setCustomersLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadCustomers() }, [loadCustomers])
+
   // ── Derived state ──
-  const filtered = customers.filter(c => {
+  const filtered = customerList.filter(c => {
     const matchSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -822,17 +876,36 @@ export function CustomersPage() {
   const resetPage = () => setCurrentPage(1)
 
   // ── Stats ──
-  const totalCustomers = customers.length
-  const newThisMonth = customers.filter(c => {
+  const totalCustomers = customerList.length
+  const newThisMonth = customerList.filter(c => {
     const join = new Date(c.joinDate)
     const now = new Date()
     return join.getMonth() === now.getMonth() && join.getFullYear() === now.getFullYear()
   }).length
-  const activeCustomers = customers.filter(c => c.segment !== 'New' || c.totalOrders >= 2).length
-  const avgClv = Math.round(customers.reduce((acc, c) => acc + c.totalSpend, 0) / customers.length)
+  const activeCustomers = customerList.filter(c => c.segment !== 'New' || c.totalOrders >= 2).length
+  const avgClv = customerList.length > 0
+    ? Math.round(customerList.reduce((acc, c) => acc + c.totalSpend, 0) / customerList.length)
+    : 0
+
+  if (customersLoading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
+        <div className="text-center space-y-2">
+          <Users className="w-10 h-10 mx-auto animate-pulse" />
+          <p>Memuat pelanggan...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
+      {customersError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700">
+          <span>Gagal terhubung ke server — menampilkan data contoh</span>
+          <Button variant="outline" size="sm" onClick={loadCustomers}>Muat Ulang</Button>
+        </div>
+      )}
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Manajemen Pelanggan</h1>
