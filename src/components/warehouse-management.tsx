@@ -161,7 +161,7 @@ function WarehouseFormDialog({
   const [loadingDistrict, setLoadingDistrict] = useState(false)
   const [loadingVillage,  setLoadingVillage]  = useState(false)
 
-  // Reset & load countries when dialog opens
+  // Load semua data saat dialog buka — sequential untuk edit mode
   useEffect(() => {
     if (!open) return
     setForm(initial)
@@ -169,40 +169,61 @@ function WarehouseFormDialog({
     setCities([])
     setDistricts([])
     setVillages([])
-    setLoadingCountry(true)
-    regionsApi.countries()
-      .then(r => setCountries(Array.isArray(r) ? r : []))
-      .catch(() => setCountries([]))
-      .finally(() => setLoadingCountry(false))
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When editing: pre-load cascade if IDs are available
-  useEffect(() => {
-    if (!open) return
-    if (initial.province_id) {
-      const id = initial.province_id
+    let cancelled = false
+
+    async function init() {
+      // 1. Load countries
+      setLoadingCountry(true)
+      const countryList = await regionsApi.countries()
+        .then(r => Array.isArray(r) ? r : []).catch(() => [])
+      if (cancelled) return
+      setCountries(countryList)
+      setLoadingCountry(false)
+
+      // 2. Load provinces (cari country_id dari nama)
+      const countryItem = countryList.find(
+        c => c.name.toLowerCase() === (initial.country ?? '').toLowerCase()
+      )
+      if (!countryItem) return
+
+      setLoadingProvince(true)
+      const provinceList = await regionsApi.provinces(countryItem.id)
+        .then(r => Array.isArray(r) ? r : []).catch(() => [])
+      if (cancelled) return
+      setProvinces(provinceList)
+      setLoadingProvince(false)
+
+      // 3. Load cities jika ada province_id (edit mode)
+      if (!initial.province_id) return
       setLoadingCity(true)
-      regionsApi.cities(id)
-        .then(r => setCities(Array.isArray(r) ? r : []))
-        .catch(() => setCities([]))
-        .finally(() => setLoadingCity(false))
-    }
-    if (initial.city_id) {
-      const id = initial.city_id
+      const cityList = await regionsApi.cities(initial.province_id)
+        .then(r => Array.isArray(r) ? r : []).catch(() => [])
+      if (cancelled) return
+      setCities(cityList)
+      setLoadingCity(false)
+
+      // 4. Load districts jika ada city_id
+      if (!initial.city_id) return
       setLoadingDistrict(true)
-      regionsApi.districts(id)
-        .then(r => setDistricts(Array.isArray(r) ? r : []))
-        .catch(() => setDistricts([]))
-        .finally(() => setLoadingDistrict(false))
-    }
-    if (initial.district_id) {
-      const id = initial.district_id
+      const districtList = await regionsApi.districts(initial.city_id)
+        .then(r => Array.isArray(r) ? r : []).catch(() => [])
+      if (cancelled) return
+      setDistricts(districtList)
+      setLoadingDistrict(false)
+
+      // 5. Load villages jika ada district_id
+      if (!initial.district_id) return
       setLoadingVillage(true)
-      regionsApi.villages(id)
-        .then(r => setVillages(Array.isArray(r) ? r : []))
-        .catch(() => setVillages([]))
-        .finally(() => setLoadingVillage(false))
+      const villageList = await regionsApi.villages(initial.district_id)
+        .then(r => Array.isArray(r) ? r : []).catch(() => [])
+      if (cancelled) return
+      setVillages(villageList)
+      setLoadingVillage(false)
     }
+
+    init()
+    return () => { cancelled = true }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCountryChange = (countryId: string) => {
