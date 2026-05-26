@@ -5,7 +5,7 @@ import {
   AlertTriangle, Handshake, Megaphone, UserCog, Warehouse,
   ChevronLeft, ChevronRight, ChevronDown, Brain,
 } from 'lucide-react'
-import miniLogo from '../assets/images/mini-logo-lapakoo.png'
+const miniLogo = "/logo-transparent.png";
 import { cn } from "./ui/utils"
 import { useTenant } from '../contexts/TenantContext'
 import { useAuth } from '../contexts/AuthContext'

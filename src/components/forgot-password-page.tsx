@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Mail, ArrowLeft, CheckCircle2, Store } from "lucide-react";
-import logoLapakoo from "../assets/images/logo-lapakoo.png";
+const logoLapakoo = "/logo-transparent.png";
 import { useTenant } from "../contexts/TenantContext";
 
 interface ForgotPasswordPageProps {

@@ -3,46 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Eye, EyeOff, Lock, Mail, Crown, ShieldCheck, User as UserIcon, ChevronDown, Store } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Store } from "lucide-react";
 import { useTenant } from "../contexts/TenantContext";
 import { useAuth } from "../contexts/AuthContext";
-import logoLapakoo from "../assets/images/logo-lapakoo.png";
+const logoLapakoo = "/logo-transparent.png";
 
 interface LoginPageProps {
   onForgotPassword: () => void;
 }
 
-interface DemoAccount {
-  email: string;
-  password: string;
-  label: string;
-  icon: typeof Crown;
-  hint: string;
-}
-
-const DEMO_ACCOUNTS: DemoAccount[] = [
-  {
-    email: 'budi@tokobudi.seller.id',
-    password: 'demo123',
-    label: 'Pemilik',
-    icon: Crown,
-    hint: 'akses penuh',
-  },
-  {
-    email: 'siti@tokobudi.seller.id',
-    password: 'demo123',
-    label: 'Admin',
-    icon: ShieldCheck,
-    hint: 'tanpa Tim & Pengaturan edit',
-  },
-  {
-    email: 'doni@tokobudi.seller.id',
-    password: 'demo123',
-    label: 'Staf',
-    icon: UserIcon,
-    hint: 'operasional pesanan',
-  },
-];
 
 export function LoginPage({ onForgotPassword }: LoginPageProps) {
   const { tenant } = useTenant();
@@ -52,7 +21,6 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showDemo, setShowDemo] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -72,11 +40,6 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
     }
   };
 
-  const fillCredentials = (acc: DemoAccount) => {
-    setEmail(acc.email);
-    setPassword(acc.password);
-    setError("");
-  };
 
   const primaryColor = tenant?.primaryColor ?? '#6366f1';
 
@@ -213,51 +176,6 @@ export function LoginPage({ onForgotPassword }: LoginPageProps) {
                 </Button>
               </form>
 
-              <div className="mt-5 rounded-xl border border-slate-200 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowDemo(!showDemo)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                >
-                  <span className="text-xs font-semibold text-slate-600">Demo Credentials</span>
-                  <ChevronDown
-                    className="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"
-                    style={{ transform: showDemo ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                  />
-                </button>
-                {showDemo && (
-                  <div className="p-3 space-y-2 bg-slate-50">
-                    <p className="text-[11px] text-slate-500">Klik salah satu untuk auto-fill, password sama: <span className="font-mono">demo123</span></p>
-                    <div className="space-y-1.5">
-                      {DEMO_ACCOUNTS.map((acc) => {
-                        const Icon = acc.icon;
-                        return (
-                          <button
-                            key={acc.email}
-                            type="button"
-                            onClick={() => fillCredentials(acc)}
-                            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 active:bg-slate-50 transition-colors text-left"
-                            disabled={isLoading}
-                          >
-                            <div
-                              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
-                              style={{ backgroundColor: primaryColor }}
-                            >
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-semibold text-slate-700 leading-tight">
-                                {acc.label} <span className="text-slate-400 font-normal">— {acc.hint}</span>
-                              </p>
-                              <p className="text-[10px] text-slate-500 font-mono truncate">{acc.email}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
 

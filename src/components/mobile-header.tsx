@@ -1,6 +1,6 @@
 import { Bell } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
-import miniLogo from '../assets/images/mini-logo-lapakoo.png'
+const miniLogo = "/logo-transparent.png";
 
 interface MobileHeaderProps {
   userEmail: string

@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Eye, EyeOff, Lock, Mail, User, Building2, Phone, MapPin } from "lucide-react";
-import logoLapakoo from "../assets/images/logo-lapakoo.png";
+const logoLapakoo = "/logo-transparent.png";
 
 interface RegisterPageProps {
   onBackToLogin: () => void;

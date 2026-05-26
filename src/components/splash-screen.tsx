@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import logoLapakoo from "../assets/images/logo-lapakoo.png";
+const logoLapakoo = "/logo-transparent.png";
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -11,12 +11,12 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("visible"), 100);
-    const t2 = setTimeout(() => setPhase("exit"), 2400);
-    const t3 = setTimeout(() => onFinish(), 2900);
+    const t2 = setTimeout(() => setPhase("exit"), 1100);
+    const t3 = setTimeout(() => onFinish(), 1500);
 
     let frame: number;
     let start: number | null = null;
-    const duration = 2200;
+    const duration = 1000;
 
     const tick = (now: number) => {
       if (!start) start = now;

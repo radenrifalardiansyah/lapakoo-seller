@@ -311,7 +311,7 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
-  const handleLogoutComplete = useCallback(() => setSplashDone(false), []);
+  const handleLogoutComplete = useCallback(() => setSplashDone(true), []);
 
   return (
     <>
