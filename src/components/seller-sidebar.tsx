@@ -54,6 +54,9 @@ export function SellerSidebar({
   const [isTodayCollapsed, setIsTodayCollapsed] = useState(
     () => localStorage.getItem('sidebar-today-collapsed') === 'true'
   )
+  const [isBottomCollapsed, setIsBottomCollapsed] = useState(
+    () => localStorage.getItem('sidebar-bottom-collapsed') === 'true'
+  )
   const { tenant, hasFeature } = useTenant()
   const { canAccessTab } = useAuth()
 
@@ -67,6 +70,13 @@ export function SellerSidebar({
   const toggleToday = () => {
     setIsTodayCollapsed(v => {
       localStorage.setItem('sidebar-today-collapsed', String(!v))
+      return !v
+    })
+  }
+
+  const toggleBottom = () => {
+    setIsBottomCollapsed(v => {
+      localStorage.setItem('sidebar-bottom-collapsed', String(!v))
       return !v
     })
   }
@@ -238,29 +248,54 @@ export function SellerSidebar({
         </div>
 
         {/* Bottom Nav */}
-        <div className={cn("p-3 border-t border-gray-100 space-y-0.5", isDesktopCollapsed && "md:px-2")}>
-          {visibleBottom.map(item => <NavItem key={item.id} {...item} />)}
-          {isDesktopCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
+        <div className="border-t border-gray-100">
+          {/* Toggle bar */}
+          <button
+            onClick={toggleBottom}
+            className={cn(
+              "w-full flex items-center justify-between px-4 py-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors",
+              isDesktopCollapsed && "md:justify-center md:px-0"
+            )}
+            title={isBottomCollapsed ? 'Tampilkan menu bawah' : 'Sembunyikan menu bawah'}
+          >
+            <span className={cn("text-[10px] font-semibold uppercase tracking-wider", isDesktopCollapsed && "md:hidden")}>
+              Lainnya
+            </span>
+            <ChevronDown
+              className={cn(
+                "w-3.5 h-3.5 transition-transform duration-200",
+                isBottomCollapsed && "rotate-180"
+              )}
+            />
+          </button>
+
+          {/* Collapsible items */}
+          {!isBottomCollapsed && (
+            <div className={cn("pb-3 px-3 space-y-0.5", isDesktopCollapsed && "md:px-2")}>
+              {visibleBottom.map(item => <NavItem key={item.id} {...item} />)}
+              {isDesktopCollapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={onLogout}
+                      className="w-full flex items-center justify-center py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150 md:px-0 px-3 md:gap-0 gap-3"
+                    >
+                      <LogOut className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 text-left md:hidden">Keluar</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Keluar</TooltipContent>
+                </Tooltip>
+              ) : (
                 <button
                   onClick={onLogout}
-                  className="w-full flex items-center justify-center py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150 md:px-0 px-3 md:gap-0 gap-3"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
                 >
                   <LogOut className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 text-left md:hidden">Keluar</span>
+                  <span className="flex-1 text-left">Keluar</span>
                 </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Keluar</TooltipContent>
-            </Tooltip>
-          ) : (
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              <span className="flex-1 text-left">Keluar</span>
-            </button>
+              )}
+            </div>
           )}
         </div>
       </div>

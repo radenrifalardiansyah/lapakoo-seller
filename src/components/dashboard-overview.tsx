@@ -4,6 +4,7 @@ import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 import { Input } from "./ui/input"
 import { Separator } from "./ui/separator"
 import { Skeleton } from "./ui/skeleton"
@@ -258,10 +259,14 @@ export function DashboardOverview({ onAddProduct, onViewAllOrders }: { onAddProd
           <p className="text-muted-foreground">Selamat datang kembali! Berikut ringkasan toko Anda hari ini.</p>
         </div>
         {!isStarter && (
-          <Button onClick={onAddProduct} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Tambah Produk
-          </Button>
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" onClick={onAddProduct}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Tambah Produk</TooltipContent>
+          </UITooltip>
         )}
       </div>
 
