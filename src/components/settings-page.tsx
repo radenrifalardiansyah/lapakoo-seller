@@ -179,7 +179,7 @@ export function SettingsPage() {
   const [isEditing, setIsEditing]   = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [savingStore, setSavingStore] = useState(false);
-  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load all settings from API on mount
@@ -339,16 +339,6 @@ export function SettingsPage() {
 
   const pwdStrength = getPasswordStrength(newPwd);
 
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground">
-        <div className="text-center space-y-2">
-          <Settings className="w-10 h-10 mx-auto animate-pulse" />
-          <p>Memuat pengaturan...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
