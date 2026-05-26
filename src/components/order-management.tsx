@@ -5,6 +5,8 @@ import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -1155,7 +1157,7 @@ function OrdersTable({
 export function OrderManagement() {
   const { hasFeature, tenant } = useTenant()
   const [orders, setOrders] = useState<Order[]>([])
-  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersError, setOrdersError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all')
@@ -1377,16 +1379,6 @@ export function OrderManagement() {
     { value: 'retur',      label: 'Retur',      count: stats.retur },
   ]
 
-  if (ordersLoading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground">
-        <div className="text-center space-y-2">
-          <ShoppingCart className="w-10 h-10 mx-auto animate-pulse" />
-          <p>Memuat pesanan...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
@@ -1404,16 +1396,24 @@ export function OrderManagement() {
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {hasFeature('export-data') && (
-            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
-              Export Excel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExport}>
+                  <ExcelIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
           )}
           {hasFeature('export-pdf') && (
-            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Export PDF
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExportPdf}>
+                  <PdfIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export PDF</TooltipContent>
+            </Tooltip>
           )}
         </div>
       </div>

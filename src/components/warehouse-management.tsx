@@ -4,6 +4,8 @@ import { exportPdf, fileStamp } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { TruncatedText } from './ui/truncated-text'
 import { Button } from './ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
@@ -774,26 +776,51 @@ export function WarehouseManagement() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasFeature('export-data') && (
-            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4" />Export Excel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExport}>
+                  <ExcelIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
           )}
           {hasFeature('export-pdf') && (
-            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />Export PDF
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExportPdf}>
+                  <PdfIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export PDF</TooltipContent>
+            </Tooltip>
           )}
-          <Button variant="outline" onClick={() => setIsAdjustOpen(true)} disabled={activeCount === 0}>
-            <SlidersHorizontal className="w-4 h-4 mr-1.5" />Penyesuaian Stok
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" onClick={() => setIsAdjustOpen(true)} disabled={activeCount === 0}>
+                <SlidersHorizontal className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Penyesuaian Stok</TooltipContent>
+          </Tooltip>
           {hasFeature('stock-transfer') && (
-            <Button variant="outline" onClick={() => setIsTransferOpen(true)} disabled={activeCount < 2}>
-              <ArrowRightLeft className="w-4 h-4 mr-1.5" />Transfer Stok
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={() => setIsTransferOpen(true)} disabled={activeCount < 2}>
+                  <ArrowRightLeft className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Transfer Stok</TooltipContent>
+            </Tooltip>
           )}
-          <Button onClick={() => setIsAddOpen(true)} disabled={atLimit}>
-            <Plus className="w-4 h-4 mr-1.5" />Tambah Gudang
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" onClick={() => setIsAddOpen(true)} disabled={atLimit}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Tambah Gudang</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

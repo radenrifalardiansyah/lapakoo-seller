@@ -5,6 +5,8 @@ import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
 import { Label } from "./ui/label"
@@ -875,7 +877,7 @@ function mapApiReseller(r: ApiReseller): Reseller {
 export function ResellerPage() {
   const { hasFeature, tenant } = useTenant()
   const [resellers, setResellers]         = useState<Reseller[]>([])
-  const [resellersLoading, setResellersLoading] = useState(true)
+  const [resellersLoading, setResellersLoading] = useState(false)
   const [resellersError, setResellersError] = useState<string | null>(null)
   const [tierSettings, setTierSettings]   = useState<Record<ResellerTier, TierBusinessConfig>>(DEFAULT_TIER_SETTINGS)
   const [searchTerm, setSearchTerm]       = useState('')
@@ -1090,16 +1092,6 @@ export function ResellerPage() {
     { value: 'suspended', label: 'Disuspend', count: stats.suspended },
   ]
 
-  if (resellersLoading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground">
-        <div className="text-center space-y-2">
-          <Handshake className="w-10 h-10 mx-auto animate-pulse" />
-          <p>Memuat reseller...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
@@ -1118,22 +1110,42 @@ export function ResellerPage() {
           <p className="text-muted-foreground">Kelola jaringan reseller, tier, dan pembayaran komisi</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setIsTierSettingsOpen(true)}>
-            <Settings2 className="w-4 h-4 mr-1.5" />Pengaturan Tier
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" onClick={() => setIsTierSettingsOpen(true)}>
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Pengaturan Tier</TooltipContent>
+          </Tooltip>
           {hasFeature('export-data') && (
-            <Button variant="outline" onClick={handleExport}>
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" />Export Excel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExport}>
+                  <ExcelIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
           )}
           {hasFeature('export-pdf') && (
-            <Button variant="outline" onClick={handleExportPdf}>
-              <FileText className="w-4 h-4 mr-1.5" />Export PDF
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExportPdf}>
+                  <PdfIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export PDF</TooltipContent>
+            </Tooltip>
           )}
-          <Button onClick={() => setIsAddOpen(true)}>
-            <Plus className="w-4 h-4 mr-1.5" />Tambah Reseller
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" onClick={() => setIsAddOpen(true)}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Tambah Reseller</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

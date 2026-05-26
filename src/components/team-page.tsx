@@ -7,6 +7,7 @@ import { useTenant } from '../contexts/TenantContext'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 import { teamApi, type ApiTeamUser } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -332,16 +333,22 @@ export function TeamPage() {
             Kelola akun karyawan yang dapat mengakses dashboard toko Anda
           </p>
         </div>
-        <Button
-          onClick={openAdd}
-          disabled={atLimit}
-          className="text-white flex items-center gap-2 shrink-0"
-          style={!atLimit ? { backgroundColor: primaryColor } : undefined}
-          title={atLimit ? `Batas maksimal ${maxUsers} user untuk paket ${tenant?.package.name}` : undefined}
-        >
-          <UserPlus className="w-4 h-4" />
-          Tambah User
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              onClick={openAdd}
+              disabled={atLimit}
+              className="text-white shrink-0"
+              style={!atLimit ? { backgroundColor: primaryColor } : undefined}
+            >
+              <UserPlus className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {atLimit ? `Batas maksimal ${maxUsers} user untuk paket ${tenant?.package.name}` : 'Tambah User'}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Error banner */}

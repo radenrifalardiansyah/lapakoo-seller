@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { SplashScreen } from "./components/splash-screen";
 import { TenantProvider, useTenant } from "./contexts/TenantContext";
 import { InventoryProvider, useInventory } from "./contexts/InventoryContext";
@@ -78,8 +78,9 @@ function TenantErrorScreen({ message }: { message: string }) {
 
 function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
   const { tenant, loading, error, hasFeature, refreshTenant, resetTenant } = useTenant();
-  const { products, totalStockOf } = useInventory();
+  const { products, totalStockOf, reload: reloadInventory } = useInventory();
   const { user, token, loading: authLoading, logout, canAccessTab } = useAuth();
+  const prevUserRef = useRef<typeof user>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [productAction, setProductAction] = useState<'add' | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -98,6 +99,14 @@ function AppInner({ onLogoutComplete }: { onLogoutComplete: () => void }) {
       resetTenant();
     }
   }, [token, refreshTenant, resetTenant]);
+
+  // Reload inventory saat user baru tersedia (login / session restore)
+  useEffect(() => {
+    if (user && prevUserRef.current === null) {
+      reloadInventory();
+    }
+    prevUserRef.current = user;
+  }, [user, reloadInventory]);
 
   useEffect(() => {
     if (!user) return

@@ -4,6 +4,8 @@ import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { TruncatedText } from './ui/truncated-text'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from "./ui/input"
 import { Label } from "./ui/label"
 import { Textarea } from "./ui/textarea"
@@ -959,18 +961,33 @@ export function MarketingPage() {
                     </SelectContent>
                   </Select>
                   {hasFeature('export-data') && (
-                    <Button variant="outline" onClick={handleExportVouchers}>
-                      <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" variant="outline" onClick={handleExportVouchers}>
+                          <ExcelIcon className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Export Excel</TooltipContent>
+                    </Tooltip>
                   )}
                   {hasFeature('export-pdf') && (
-                    <Button variant="outline" onClick={handleExportVouchersPdf}>
-                      <FileText className="w-4 h-4 mr-1.5" />PDF
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" variant="outline" onClick={handleExportVouchersPdf}>
+                          <PdfIcon className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Export PDF</TooltipContent>
+                    </Tooltip>
                   )}
-                  <Button onClick={() => setAddVoucherOpen(true)}>
-                    <Plus className="w-4 h-4 mr-1.5" />Buat Voucher
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="icon" onClick={() => setAddVoucherOpen(true)}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Buat Voucher</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </CardHeader>
@@ -1133,9 +1150,14 @@ export function MarketingPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={() => setAddFSOpen(true)}>
-              <Plus className="w-4 h-4 mr-1.5" />Buat Flash Sale
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" onClick={() => setAddFSOpen(true)}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Buat Flash Sale</TooltipContent>
+            </Tooltip>
           </div>
 
           {filteredFS.length === 0 ? (

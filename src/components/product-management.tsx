@@ -8,6 +8,8 @@ import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { TruncatedText } from './ui/truncated-text'
 import { Button } from "./ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -1106,31 +1108,51 @@ export function ProductManagement({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasFeature('export-data') && (
-            <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4" />
-              Export Excel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExport}>
+                  <ExcelIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
           )}
           {hasFeature('export-pdf') && (
-            <Button variant="outline" onClick={handleExportPdf} className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Export PDF
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={handleExportPdf}>
+                  <PdfIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export PDF</TooltipContent>
+            </Tooltip>
           )}
           {hasFeature('bulk-import') && (
-            <Button variant="outline" onClick={() => setIsImportOpen(true)} className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              Import Massal
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="outline" onClick={() => setIsImportOpen(true)}>
+                  <Upload className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Import Massal</TooltipContent>
+            </Tooltip>
           )}
-          <Button variant="outline" onClick={() => setIsCategoryOpen(true)} className="flex items-center gap-2">
-            <Tags className="w-4 h-4" />
-            Kategori
-          </Button>
-          <Button onClick={() => setIsAddOpen(true)} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Tambah Produk
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="outline" onClick={() => setIsCategoryOpen(true)}>
+                <Tags className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Kategori</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" onClick={() => setIsAddOpen(true)}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Tambah Produk</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

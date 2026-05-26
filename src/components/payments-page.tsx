@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp, formatRupiah } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { ExcelIcon, PdfIcon } from './ui/file-icons'
 import { Input } from "./ui/input"
 import { Label } from "./ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -704,13 +706,13 @@ export function PaymentsPage() {
 
               {hasFeature('export-data') && (
                 <Button size="sm" variant="outline" onClick={handleExportReport} className="h-8 text-xs">
-                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                  <ExcelIcon className="w-3.5 h-3.5 mr-1.5" />
                   Excel
                 </Button>
               )}
               {hasFeature('export-pdf') && (
                 <Button size="sm" variant="outline" onClick={handleExportReportPdf} className="h-8 text-xs">
-                  <FileText className="w-3.5 h-3.5 mr-1.5" />
+                  <PdfIcon className="w-3.5 h-3.5 mr-1.5" />
                   PDF
                 </Button>
               )}
@@ -977,14 +979,24 @@ export function PaymentsPage() {
                 </SelectContent>
               </Select>
               {hasFeature('export-data') && (
-                <Button variant="outline" onClick={handleExportTx}>
-                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
-                </Button>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="outline" onClick={handleExportTx}>
+                      <ExcelIcon className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export Excel</TooltipContent>
+                </UITooltip>
               )}
               {hasFeature('export-pdf') && (
-                <Button variant="outline" onClick={handleExportTxPdf}>
-                  <FileText className="w-4 h-4 mr-1.5" />PDF
-                </Button>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="outline" onClick={handleExportTxPdf}>
+                      <PdfIcon className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export PDF</TooltipContent>
+                </UITooltip>
               )}
             </div>
           </div>

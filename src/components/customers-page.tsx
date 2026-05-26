@@ -829,7 +829,7 @@ function CustomerHistoryDialog({
 export function CustomersPage() {
   const { hasFeature, tenant } = useTenant()
   const [customerList, setCustomerList] = useState<Customer[]>([])
-  const [customersLoading, setCustomersLoading] = useState(true)
+  const [customersLoading, setCustomersLoading] = useState(false)
   const [customersError, setCustomersError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<'all' | Segment>('all')
@@ -918,16 +918,6 @@ export function CustomersPage() {
     ? Math.round(customerList.reduce((acc, c) => acc + c.totalSpend, 0) / customerList.length)
     : 0
 
-  if (customersLoading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground">
-        <div className="text-center space-y-2">
-          <Users className="w-10 h-10 mx-auto animate-pulse" />
-          <p>Memuat pelanggan...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
