@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { exportPdf, fileStamp } from '../lib/pdf-export'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -18,6 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from './ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { SearchableSelect, type SelectOption } from './ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import {
   Pagination, PaginationContent, PaginationItem,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 import { useInventory } from '../contexts/InventoryContext'
+import { regionsApi, type ApiRegionItem } from '../lib/api'
 import type { MovementType, WarehouseLocation } from '../types/inventory'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,6 +132,10 @@ function TableFooterBar({
 
 // ─── Warehouse Form Dialog ────────────────────────────────────────────────────
 
+function toOptions(items: ApiRegionItem[]): SelectOption[] {
+  return items.map(i => ({ value: String(i.id), label: i.name }))
+}
+
 function WarehouseFormDialog({
   open, onClose, onSave, mode, initial,
 }: {
@@ -143,7 +149,151 @@ function WarehouseFormDialog({
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [k]: v }))
 
-  const canSave = form.name.trim() && form.code.trim() && form.city.trim()
+  const [countries, setCountries]   = useState<ApiRegionItem[]>([])
+  const [provinces, setProvinces]   = useState<ApiRegionItem[]>([])
+  const [cities, setCities]         = useState<ApiRegionItem[]>([])
+  const [districts, setDistricts]   = useState<ApiRegionItem[]>([])
+  const [villages, setVillages]     = useState<ApiRegionItem[]>([])
+
+  const [loadingCountry,  setLoadingCountry]  = useState(false)
+  const [loadingProvince, setLoadingProvince] = useState(false)
+  const [loadingCity,     setLoadingCity]     = useState(false)
+  const [loadingDistrict, setLoadingDistrict] = useState(false)
+  const [loadingVillage,  setLoadingVillage]  = useState(false)
+
+  // Reset & load countries when dialog opens
+  useEffect(() => {
+    if (!open) return
+    setForm(initial)
+    setProvinces([])
+    setCities([])
+    setDistricts([])
+    setVillages([])
+    setLoadingCountry(true)
+    regionsApi.countries()
+      .then(r => setCountries(Array.isArray(r) ? r : []))
+      .catch(() => setCountries([]))
+      .finally(() => setLoadingCountry(false))
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When editing: pre-load cascade if IDs are available
+  useEffect(() => {
+    if (!open) return
+    if (initial.province_id) {
+      const id = initial.province_id
+      setLoadingCity(true)
+      regionsApi.cities(id)
+        .then(r => setCities(Array.isArray(r) ? r : []))
+        .catch(() => setCities([]))
+        .finally(() => setLoadingCity(false))
+    }
+    if (initial.city_id) {
+      const id = initial.city_id
+      setLoadingDistrict(true)
+      regionsApi.districts(id)
+        .then(r => setDistricts(Array.isArray(r) ? r : []))
+        .catch(() => setDistricts([]))
+        .finally(() => setLoadingDistrict(false))
+    }
+    if (initial.district_id) {
+      const id = initial.district_id
+      setLoadingVillage(true)
+      regionsApi.villages(id)
+        .then(r => setVillages(Array.isArray(r) ? r : []))
+        .catch(() => setVillages([]))
+        .finally(() => setLoadingVillage(false))
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCountryChange = (countryId: string) => {
+    const item = countries.find(c => String(c.id) === countryId)
+    setForm(prev => ({
+      ...prev,
+      country: item?.name ?? '',
+      province: '', province_id: null,
+      city: '', city_id: null,
+      district: '', district_id: null,
+      village: '',
+    }))
+    setProvinces([])
+    setCities([])
+    setDistricts([])
+    setVillages([])
+    if (!item) return
+    setLoadingProvince(true)
+    regionsApi.provinces(item.id)
+      .then(r => setProvinces(Array.isArray(r) ? r : []))
+      .catch(() => setProvinces([]))
+      .finally(() => setLoadingProvince(false))
+  }
+
+  const handleProvinceChange = (provinceId: string) => {
+    const item = provinces.find(p => String(p.id) === provinceId)
+    setForm(prev => ({
+      ...prev,
+      province: item?.name ?? '', province_id: item?.id ?? null,
+      city: '', city_id: null,
+      district: '', district_id: null,
+      village: '',
+    }))
+    setCities([])
+    setDistricts([])
+    setVillages([])
+    if (!item) return
+    setLoadingCity(true)
+    regionsApi.cities(item.id)
+      .then(r => setCities(Array.isArray(r) ? r : []))
+      .catch(() => setCities([]))
+      .finally(() => setLoadingCity(false))
+  }
+
+  const handleCityChange = (cityId: string) => {
+    const item = cities.find(c => String(c.id) === cityId)
+    setForm(prev => ({
+      ...prev,
+      city: item?.name ?? '', city_id: item?.id ?? null,
+      district: '', district_id: null,
+      village: '',
+    }))
+    setDistricts([])
+    setVillages([])
+    if (!item) return
+    setLoadingDistrict(true)
+    regionsApi.districts(item.id)
+      .then(r => setDistricts(Array.isArray(r) ? r : []))
+      .catch(() => setDistricts([]))
+      .finally(() => setLoadingDistrict(false))
+  }
+
+  const handleDistrictChange = (districtId: string) => {
+    const item = districts.find(d => String(d.id) === districtId)
+    setForm(prev => ({
+      ...prev,
+      district: item?.name ?? '', district_id: item?.id ?? null,
+      village: '',
+    }))
+    setVillages([])
+    if (!item) return
+    setLoadingVillage(true)
+    regionsApi.villages(item.id)
+      .then(r => setVillages(Array.isArray(r) ? r : []))
+      .catch(() => setVillages([]))
+      .finally(() => setLoadingVillage(false))
+  }
+
+  const handleVillageChange = (villageId: string) => {
+    const item = villages.find(v => String(v.id) === villageId)
+    setForm(prev => ({ ...prev, village: item?.name ?? '' }))
+  }
+
+  // Resolve selected values for SearchableSelect (value = string ID)
+  const selectedCountryId  = String(countries.find(c => c.name === form.country)?.id ?? '')
+  const selectedProvinceId = String(form.province_id ?? '')
+  const selectedCityId     = String(form.city_id ?? '')
+  const selectedDistrictId = String(form.district_id ?? '')
+  const selectedVillageId  = String(villages.find(v => v.name === form.village)?.id ?? '')
+
+  const canSave = form.name.trim() && form.code.trim() && form.country.trim()
 
   const handleSave = () => {
     if (!canSave) return
@@ -152,12 +302,14 @@ function WarehouseFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={o => { if (o) setForm(initial); else onClose() }}>
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose() }}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === 'add' ? 'Tambah Gudang Baru' : 'Edit Gudang'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
+
+          {/* Code & Name */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Kode Gudang <span className="text-red-500">*</span></Label>
@@ -169,36 +321,123 @@ function WarehouseFormDialog({
             </div>
           </div>
 
+          {/* Country */}
           <div className="space-y-1.5">
-            <Label>Alamat Lengkap</Label>
-            <Textarea value={form.address} onChange={e => set('address', e.target.value)} placeholder="Jalan, kelurahan, kecamatan..." rows={2} />
+            <Label>Country <span className="text-red-500">*</span></Label>
+            <SearchableSelect
+              value={selectedCountryId}
+              onValueChange={handleCountryChange}
+              options={toOptions(countries)}
+              placeholder="Select country..."
+              searchPlaceholder="Search country..."
+              loading={loadingCountry}
+              emptyText="No countries found."
+            />
+            {form.country && !selectedCountryId && (
+              <p className="text-xs text-muted-foreground">Saved: {form.country}</p>
+            )}
           </div>
 
+          {/* Province */}
+          <div className="space-y-1.5">
+            <Label>Province</Label>
+            <SearchableSelect
+              value={selectedProvinceId}
+              onValueChange={handleProvinceChange}
+              options={toOptions(provinces)}
+              placeholder={provinces.length === 0 ? 'Select country first' : 'Select province...'}
+              searchPlaceholder="Search province..."
+              loading={loadingProvince}
+              disabled={provinces.length === 0 && !loadingProvince}
+              emptyText="No provinces found."
+            />
+            {form.province && !selectedProvinceId && (
+              <p className="text-xs text-muted-foreground">Saved: {form.province}</p>
+            )}
+          </div>
+
+          {/* City */}
+          <div className="space-y-1.5">
+            <Label>City / Regency</Label>
+            <SearchableSelect
+              value={selectedCityId}
+              onValueChange={handleCityChange}
+              options={toOptions(cities)}
+              placeholder={cities.length === 0 ? 'Select province first' : 'Select city...'}
+              searchPlaceholder="Search city..."
+              loading={loadingCity}
+              disabled={cities.length === 0 && !loadingCity}
+              emptyText="No cities found."
+            />
+            {form.city && !selectedCityId && (
+              <p className="text-xs text-muted-foreground">Saved: {form.city}</p>
+            )}
+          </div>
+
+          {/* District */}
+          <div className="space-y-1.5">
+            <Label>District</Label>
+            <SearchableSelect
+              value={selectedDistrictId}
+              onValueChange={handleDistrictChange}
+              options={toOptions(districts)}
+              placeholder={districts.length === 0 ? 'Select city first' : 'Select district...'}
+              searchPlaceholder="Search district..."
+              loading={loadingDistrict}
+              disabled={districts.length === 0 && !loadingDistrict}
+              emptyText="No districts found."
+            />
+            {form.district && !selectedDistrictId && (
+              <p className="text-xs text-muted-foreground">Saved: {form.district}</p>
+            )}
+          </div>
+
+          {/* Village */}
+          <div className="space-y-1.5">
+            <Label>Village</Label>
+            <SearchableSelect
+              value={selectedVillageId}
+              onValueChange={handleVillageChange}
+              options={toOptions(villages)}
+              placeholder={villages.length === 0 ? 'Select district first' : 'Select village...'}
+              searchPlaceholder="Search village..."
+              loading={loadingVillage}
+              disabled={villages.length === 0 && !loadingVillage}
+              emptyText="No villages found."
+            />
+            {form.village && !selectedVillageId && (
+              <p className="text-xs text-muted-foreground">Saved: {form.village}</p>
+            )}
+          </div>
+
+          {/* Full Address */}
+          <div className="space-y-1.5">
+            <Label>Alamat Lengkap</Label>
+            <Textarea value={form.address} onChange={e => set('address', e.target.value)} placeholder="Nama jalan, nomor, RT/RW..." rows={2} />
+          </div>
+
+          {/* PIC */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Kota <span className="text-red-500">*</span></Label>
-              <Input value={form.city} onChange={e => set('city', e.target.value)} placeholder="Jakarta Pusat" />
-            </div>
             <div className="space-y-1.5">
               <Label>Penanggung Jawab (PIC)</Label>
               <Input value={form.pic} onChange={e => set('pic', e.target.value)} placeholder="Nama PIC" />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>No. Telepon PIC</Label>
               <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="08xx-xxxx-xxxx" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <div className="flex items-center gap-3 h-10">
-                <Switch checked={form.active} onCheckedChange={v => set('active', v)} />
-                <span className="text-sm text-muted-foreground">{form.active ? 'Aktif' : 'Nonaktif'}</span>
-              </div>
+          </div>
+
+          {/* Status */}
+          <div className="space-y-1.5">
+            <Label>Status</Label>
+            <div className="flex items-center gap-3 h-10">
+              <Switch checked={form.active} onCheckedChange={v => set('active', v)} />
+              <span className="text-sm text-muted-foreground">{form.active ? 'Aktif' : 'Nonaktif'}</span>
             </div>
           </div>
 
+          {/* Primary warehouse */}
           <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <Switch checked={form.isPrimary} onCheckedChange={v => set('isPrimary', v)} />
             <div className="text-sm">
@@ -762,7 +1001,13 @@ export function WarehouseManagement() {
   }
 
   const emptyForm: Omit<WarehouseLocation, 'id'> = {
-    code: '', name: '', address: '', city: '', pic: '', phone: '',
+    code: '', name: '', address: '',
+    country: 'Indonesia',
+    province: '', province_id: null,
+    city: '', city_id: null,
+    district: '', district_id: null,
+    village: '',
+    pic: '', phone: '',
     isPrimary: warehouses.length === 0, active: true,
   }
 
@@ -1282,7 +1527,12 @@ export function WarehouseManagement() {
           onSave={data => updateWarehouse(editWh.id, data)}
           initial={{
             code: editWh.code, name: editWh.name, address: editWh.address,
-            city: editWh.city, pic: editWh.pic, phone: editWh.phone,
+            country: editWh.country,
+            province: editWh.province, province_id: editWh.province_id,
+            city: editWh.city, city_id: editWh.city_id,
+            district: editWh.district, district_id: editWh.district_id,
+            village: editWh.village,
+            pic: editWh.pic, phone: editWh.phone,
             isPrimary: editWh.isPrimary, active: editWh.active,
           }}
         />

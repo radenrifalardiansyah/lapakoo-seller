@@ -194,7 +194,14 @@ export interface ApiWarehouse {
   code: string;
   name: string;
   address?: string | null;
+  country?: string | null;
+  province?: string | null;
+  province_id?: number | null;
   city?: string | null;
+  city_id?: number | null;
+  district?: string | null;
+  district_id?: number | null;
+  village?: string | null;
   pic?: string | null;
   phone?: string | null;
   is_primary?: boolean;
@@ -209,13 +216,40 @@ export function mapApiWarehouse(w: ApiWarehouse): WarehouseLocation {
     code: w.code,
     name: w.name,
     address: w.address ?? '',
+    country: w.country ?? 'Indonesia',
+    province: w.province ?? '',
+    province_id: w.province_id ?? null,
     city: w.city ?? '',
+    city_id: w.city_id ?? null,
+    district: w.district ?? '',
+    district_id: w.district_id ?? null,
+    village: w.village ?? '',
     pic: w.pic ?? '',
     phone: w.phone ?? '',
     isPrimary: w.is_primary ?? false,
     active: w.active ?? true,
   };
 }
+
+export interface ApiRegionItem {
+  id: number;
+  name: string;
+  code?: string;
+  type?: string;
+}
+
+export const regionsApi = {
+  countries:  () =>
+    apiGet<ApiRegionItem[]>('/api/regions/countries'),
+  provinces:  (countryId: number) =>
+    apiGet<ApiRegionItem[]>(`/api/regions/provinces?country_id=${countryId}`),
+  cities:     (provinceId: number) =>
+    apiGet<ApiRegionItem[]>(`/api/regions/cities?province_id=${provinceId}`),
+  districts:  (cityId: number) =>
+    apiGet<ApiRegionItem[]>(`/api/regions/districts?city_id=${cityId}`),
+  villages:   (districtId: number) =>
+    apiGet<ApiRegionItem[]>(`/api/regions/villages?district_id=${districtId}`),
+};
 
 export interface ApiInventoryRecord {
   id?: number | string;
@@ -386,10 +420,21 @@ export const resellersApi = {
 export const warehousesApi = {
   list: () => apiGet<ApiWarehouse[] | { data: ApiWarehouse[] }>('/api/warehouses').then(normalizeList<ApiWarehouse>),
   get: (id: string) => apiGet<ApiWarehouse>(`/api/warehouses/${id}`),
-  create: (data: { code: string; name: string; address?: string | null; city?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean }) =>
-    apiPost<ApiWarehouse>('/api/warehouses', data),
-  update: (id: string, data: { name?: string; address?: string | null; city?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean; active?: boolean }) =>
-    apiPut<ApiWarehouse>(`/api/warehouses/${id}`, data),
+  create: (data: {
+    code: string; name: string; address?: string | null;
+    country?: string | null; province?: string | null; province_id?: number | null;
+    city?: string | null; city_id?: number | null;
+    district?: string | null; district_id?: number | null;
+    village?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean;
+  }) => apiPost<ApiWarehouse>('/api/warehouses', data),
+  update: (id: string, data: {
+    name?: string; address?: string | null;
+    country?: string | null; province?: string | null; province_id?: number | null;
+    city?: string | null; city_id?: number | null;
+    district?: string | null; district_id?: number | null;
+    village?: string | null; pic?: string | null; phone?: string | null;
+    is_primary?: boolean; active?: boolean;
+  }) => apiPut<ApiWarehouse>(`/api/warehouses/${id}`, data),
   remove: (id: string) => apiDelete(`/api/warehouses/${id}`),
 };
 

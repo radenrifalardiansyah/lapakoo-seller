@@ -16,7 +16,14 @@ export interface WarehouseLocation {
   code: string
   name: string
   address: string
+  country: string
+  province: string
+  province_id: number | null
   city: string
+  city_id: number | null
+  district: string
+  district_id: number | null
+  village: string
   pic: string
   phone: string
   isPrimary: boolean

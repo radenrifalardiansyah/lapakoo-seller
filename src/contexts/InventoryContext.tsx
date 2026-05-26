@@ -12,7 +12,11 @@ import { productsApi, warehousesApi, inventoryApi, mapApiProduct, mapApiWarehous
 const DEFAULT_WAREHOUSES: WarehouseLocation[] = [
   {
     id: 'wh-1', code: 'GDG-01', name: 'Gudang Utama',
-    address: '', city: 'Jakarta',
+    address: '', country: 'Indonesia',
+    province: '', province_id: null,
+    city: 'Jakarta', city_id: null,
+    district: '', district_id: null,
+    village: '',
     pic: '', phone: '', isPrimary: true, active: true,
   },
 ]
