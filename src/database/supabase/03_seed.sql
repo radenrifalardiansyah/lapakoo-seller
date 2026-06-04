@@ -38,15 +38,31 @@ values
 on conflict (id) do nothing;
 
 -- =============================================================================
+-- 1b) STORE CATEGORIES (master data kategori jenis toko)
+-- =============================================================================
+
+insert into public.store_categories (id, name, description, icon, sort_order, is_active)
+values
+  ('elektronik', 'Elektronik & Gadget',    'Toko yang menjual produk elektronik, gadget, dan aksesoris teknologi', 'laptop',         1, true),
+  ('makanan',    'Makanan & Minuman',       'Toko yang menjual makanan, minuman, snack, dan produk kuliner',         'utensils',       2, true),
+  ('fashion',    'Fashion & Pakaian',       'Toko yang menjual pakaian, baju, kaos, kemeja, dan aksesoris mode',     'shirt',          3, true),
+  ('sepatu',     'Sepatu & Tas',            'Toko yang menjual sepatu, sandal, tas, dompet, dan aksesoris',          'footprints',     4, true),
+  ('kosmetik',   'Kosmetik & Kecantikan',   'Toko yang menjual produk kosmetik, skincare, perawatan, dan kecantikan','sparkles',       5, true),
+  ('olahraga',   'Olahraga & Fitness',      'Toko yang menjual perlengkapan olahraga, gym, dan aktivitas outdoor',   'dumbbell',       6, true),
+  ('rumah',      'Rumah & Dekorasi',        'Toko yang menjual furnitur, dekorasi rumah, perabot, dan kebutuhan dapur','home',          7, true),
+  ('lainnya',    'Lainnya',                 'Kategori umum untuk toko yang tidak masuk kategori di atas',            'store',          8, true)
+on conflict (id) do nothing;
+
+-- =============================================================================
 -- 2) TENANTS (3 toko demo)
 -- =============================================================================
 
-insert into public.tenants (id, subdomain, store_name, owner_name, email, phone, primary_color, package_id, status)
+insert into public.tenants (id, subdomain, store_name, owner_name, email, phone, primary_color, package_id, store_category_id, status)
 overriding system value
 values
-  (1, 'demo',     'Toko Demo',          'Admin Demo',   'demo@seller.id',          '+62 811-1111-0001', '#6366f1', 'starter',  'active'),
-  (2, 'tokobudi', 'Toko Budi Jaya',     'Budi Santoso', 'budi@tokobudi.seller.id', '+62 811-1111-0002', '#0ea5e9', 'pro',      'active'),
-  (3, 'abcstore', 'ABC Store Official', 'Ahmad Rizki',  'admin@abcstore.seller.id','+62 811-1111-0003', '#10b981', 'business', 'active')
+  (1, 'demo',     'Toko Demo',          'Admin Demo',   'demo@seller.id',          '+62 811-1111-0001', '#6366f1', 'starter',  'lainnya',     'active'),
+  (2, 'tokobudi', 'Toko Budi Jaya',     'Budi Santoso', 'budi@tokobudi.seller.id', '+62 811-1111-0002', '#0ea5e9', 'pro',      'fashion',     'active'),
+  (3, 'abcstore', 'ABC Store Official', 'Ahmad Rizki',  'admin@abcstore.seller.id','+62 811-1111-0003', '#10b981', 'business', 'elektronik',  'active')
 on conflict (id) do nothing;
 
 -- =============================================================================

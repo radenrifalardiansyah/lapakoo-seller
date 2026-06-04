@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { storeApi, type ApiStore } from "../lib/api";
+import { storeApi, storeCategoriesApi, type ApiStore, type ApiStoreCategory } from "../lib/api";
 import { apiChangePassword } from "../lib/auth-api";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -18,8 +18,11 @@ import {
   Settings, Store, MapPin, Phone, Mail, Globe, Camera, Pencil, X, Check, Clock,
   Palette, Truck, Shield, Lock, Eye, EyeOff, Smartphone, Monitor,
   LogOut as LogOutIcon, AlertTriangle, Package, Star, MessageSquare,
-  CheckCircle2,
+  CheckCircle2, Tag,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "./ui/select";
 import { useTenant } from "../contexts/TenantContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -185,12 +188,20 @@ export function SettingsPage() {
   // Load all settings from API on mount
   useEffect(() => {
     setSettingsLoading(true);
-    storeApi.get().then(apiStore => {
+    Promise.all([
+      storeApi.get(),
+      storeCategoriesApi.list(),
+      storeCategoriesApi.getCurrent(),
+    ]).then(([apiStore, cats, currentCat]) => {
       const { storeInfo: info, decoration: deco, shipping: ship, notifications: notifs } = mapApiStore(apiStore);
       setStoreInfo(info);  setFormData(info);
       setDecoration(deco); setDecoDraft(deco);
       setShipping(ship);   setShippingDraft(ship);
       setNotifications(notifs);
+      setStoreCategories(cats ?? []);
+      const catId = currentCat?.store_category_id ?? "";
+      setStoreCategoryId(catId);
+      setCatDraft(catId);
     }).catch(() => { /* gunakan default */ })
       .finally(() => setSettingsLoading(false));
   }, []);
@@ -210,6 +221,13 @@ export function SettingsPage() {
   const [shippingEditing, setShippingEditing] = useState(false);
   const [shippingDraft, setShippingDraft] = useState<ShippingConfig>(defaultShipping);
   const [shippingSaved, setShippingSaved] = useState(false);
+
+  // ── Kategori Toko ──
+  const [storeCategories, setStoreCategories]   = useState<ApiStoreCategory[]>([]);
+  const [storeCategoryId, setStoreCategoryId]   = useState<string>("");
+  const [catDraft, setCatDraft]                 = useState<string>("");
+  const [catSaved, setCatSaved]                 = useState(false);
+  const [savingCat, setSavingCat]               = useState(false);
 
   // ── Keamanan ──
   const [twoFactor, setTwoFactor]         = useState(false);
@@ -301,6 +319,22 @@ export function SettingsPage() {
     } catch {}
     setShipping({ ...shippingDraft }); setShippingEditing(false); setShippingSaved(true);
     setTimeout(() => setShippingSaved(false), 3000);
+  };
+
+  // ── Kategori Toko handler ──
+  const handleCatSave = async () => {
+    if (!catDraft || catDraft === storeCategoryId) return;
+    setSavingCat(true);
+    try {
+      await storeCategoriesApi.update(catDraft);
+      setStoreCategoryId(catDraft);
+      setCatSaved(true);
+      setTimeout(() => setCatSaved(false), 3000);
+    } catch {
+      setCatDraft(storeCategoryId);
+    } finally {
+      setSavingCat(false);
+    }
   };
 
   // ── Notifikasi handler ──
@@ -447,6 +481,54 @@ export function SettingsPage() {
               <Button onClick={handleSave} disabled={savingStore}><Check className="w-4 h-4 mr-2" />{savingStore ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
             </div>
           )}
+
+          <Separator />
+
+          {/* Kategori Toko */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-sm font-medium">
+                <Tag className="w-3.5 h-3.5" />Kategori Toko
+              </Label>
+              {catSaved && (
+                <span className="flex items-center gap-1.5 text-xs text-green-600">
+                  <CheckCircle2 className="w-3.5 h-3.5" />Tersimpan
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Jenis produk utama yang dijual di toko Anda
+            </p>
+            <div className="flex items-center gap-3">
+              <Select
+                value={catDraft}
+                onValueChange={setCatDraft}
+                disabled={storeCategories.length === 0}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Pilih kategori toko…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {storeCategories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleCatSave}
+                disabled={savingCat || !catDraft || catDraft === storeCategoryId}
+              >
+                {savingCat ? (
+                  <span className="flex items-center gap-1.5">Menyimpan…</span>
+                ) : (
+                  <><Check className="w-3.5 h-3.5 mr-1.5" />Simpan</>
+                )}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

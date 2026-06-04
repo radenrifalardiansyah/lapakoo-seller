@@ -35,7 +35,8 @@ $$;
 -- Enable RLS pada semua tabel multi-tenant
 -- =============================================================================
 
-alter table public.packages              enable row level security;
+alter table public.packages           enable row level security;
+alter table public.store_categories   enable row level security;
 alter table public.tenants               enable row level security;
 alter table public.tenant_users          enable row level security;
 alter table public.store_settings        enable row level security;
@@ -72,6 +73,15 @@ alter table public.product_signals       enable row level security;
 
 create policy "packages readable by all"
   on public.packages for select
+  to anon, authenticated
+  using (true);
+
+-- =============================================================================
+-- Public read: store_categories (semua user perlu lihat daftar kategori toko)
+-- =============================================================================
+
+create policy "store_categories readable by all"
+  on public.store_categories for select
   to anon, authenticated
   using (true);
 

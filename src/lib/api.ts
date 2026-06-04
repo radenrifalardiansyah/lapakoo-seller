@@ -373,6 +373,25 @@ export const storeApi = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// STORE CATEGORIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface ApiStoreCategory {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export const storeCategoriesApi = {
+  list: () => apiGet<ApiStoreCategory[]>('/api/store-categories'),
+  getCurrent: () => apiGet<{ store_category_id: string | null; store_categories: ApiStoreCategory | null }>('/api/tenants/store-category'),
+  update: (store_category_id: string) => apiPut('/api/tenants/store-category', { store_category_id }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 

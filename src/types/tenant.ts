@@ -23,6 +23,25 @@ export type FeatureKey =
   | 'two-factor-auth'
   | 'ai-insights';
 
+export type StoreCategoryId =
+  | 'elektronik'
+  | 'makanan'
+  | 'fashion'
+  | 'sepatu'
+  | 'kosmetik'
+  | 'olahraga'
+  | 'rumah'
+  | 'lainnya';
+
+export interface StoreCategory {
+  id: StoreCategoryId;
+  name: string;
+  description?: string;
+  icon?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export interface Package {
   id: string;
   name: string;
@@ -42,6 +61,7 @@ export interface Tenant {
   logoUrl?: string;
   primaryColor: string;
   package: Package;
+  storeCategory?: StoreCategory;
   status: 'active' | 'inactive' | 'suspended';
 }
 

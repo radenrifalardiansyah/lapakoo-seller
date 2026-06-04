@@ -84,23 +84,42 @@ create trigger trg_packages_updated_at before update on public.packages
   for each row execute function public.set_updated_at();
 
 -- =============================================================================
+-- STORE CATEGORIES (master data kategori jenis toko)
+-- Contoh: Elektronik, Makanan & Minuman, Fashion, Kosmetik, dll.
+-- =============================================================================
+
+create table public.store_categories (
+  id          text primary key,   -- 'elektronik', 'makanan', 'fashion', ...
+  name        text not null,
+  description text,
+  icon        text,               -- nama icon (misal untuk UI: 'laptop', 'utensils', ...)
+  sort_order  integer default 0,
+  is_active   boolean default true,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+create trigger trg_store_categories_updated_at before update on public.store_categories
+  for each row execute function public.set_updated_at();
+
+-- =============================================================================
 -- TENANTS (clients / stores)
 -- =============================================================================
 
 create table public.tenants (
-  id             bigserial primary key,
-  subdomain      text unique not null,
-  store_name     text not null,
-  owner_name     text not null,
-  email          citext unique not null,
-  phone          text,
-  logo_url       text,
-  primary_color  text default '#6366f1',
-  package_id     text not null default 'starter' references public.packages(id),
-  status         tenant_status default 'active',
-  trial_ends_at  timestamptz,
-  created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
+  id                  bigserial primary key,
+  subdomain           text unique not null,
+  store_name          text not null,
+  owner_name          text not null,
+  email               citext unique not null,
+  phone               text,
+  logo_url            text,
+  primary_color       text default '#6366f1',
+  package_id          text not null default 'starter' references public.packages(id),
+  store_category_id   text references public.store_categories(id) on delete set null,
+  status              tenant_status default 'active',
+  trial_ends_at       timestamptz,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now()
 );
 create index idx_tenants_subdomain on public.tenants(subdomain);
 create index idx_tenants_status    on public.tenants(status);
