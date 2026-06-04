@@ -65,27 +65,54 @@ const DEFAULT_TENANT: Tenant = {
 
 // ─── API response → Tenant mapper ─────────────────────────────────────────────
 
+// Shape of the nested tenants object returned by GET /api/store
+interface ApiStoreTenants {
+  id?: string | number;
+  subdomain?: string;
+  store_name?: string;
+  owner_name?: string;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  status?: string;
+  package_id?: string | null;
+  packages?: {
+    id?: string;
+    max_products?: number;
+    max_orders?: number;
+    max_users?: number;
+    max_warehouses?: number;
+  };
+}
+
 interface ApiStoreWithPlan extends ApiStore {
   plan?: string;
   package?: string;
   subdomain?: string;
   owner_name?: string;
   primary_color?: string;
+  tenants?: ApiStoreTenants;
 }
 
 function mapStoreToTenant(store: ApiStoreWithPlan): Tenant {
-  const planKey = ((store.plan ?? store.package) || 'business').toLowerCase();
-  const pkg = PACKAGES[planKey] ?? PACKAGES.business;
+  // GET /api/store returns store_settings.* + nested tenants{...}
+  // store_name, logo_url, primary_color, subdomain, owner_name, dan package
+  // semuanya ada di dalam tenants, bukan top-level store_settings
+  const t = store.tenants ?? {};
+
+  // packages?.id dari join Supabase; package_id sebagai FK langsung (fallback jika join null)
+  const packageId = t.packages?.id ?? t.package_id ?? store.plan ?? store.package ?? 'business';
+  const pkg = PACKAGES[String(packageId).toLowerCase()] ?? PACKAGES.business;
+
   return {
-    id: String(store.id ?? '0'),
-    subdomain: store.subdomain ?? '',
-    storeName: store.store_name ?? store.name ?? DEFAULT_TENANT.storeName,
-    ownerName: store.owner_name ?? '',
+    id: String(t.id ?? store.id ?? '0'),
+    subdomain: t.subdomain ?? store.subdomain ?? '',
+    storeName: t.store_name ?? store.store_name ?? store.name ?? DEFAULT_TENANT.storeName,
+    ownerName: t.owner_name ?? store.owner_name ?? '',
     email: store.email ?? '',
-    logoUrl: store.logo_url ?? store.logo,
-    primaryColor: store.primary_color ?? store.theme_color ?? DEFAULT_TENANT.primaryColor,
+    logoUrl: t.logo_url ?? store.logo_url ?? store.logo,
+    primaryColor: t.primary_color ?? store.primary_color ?? store.theme_color ?? DEFAULT_TENANT.primaryColor,
     package: pkg,
-    status: 'active',
+    status: (t.status as Tenant['status']) ?? 'active',
   };
 }
 
@@ -152,6 +179,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       // /api/store gagal — gunakan data dari cache login (profile.tenants)
       const cached = loadStoreCache();
       if (cached) {
+        const pkg = (cached.packageId && PACKAGES[cached.packageId.toLowerCase()])
+          ? PACKAGES[cached.packageId.toLowerCase()]
+          : DEFAULT_TENANT.package;
         setTenant({
           ...DEFAULT_TENANT,
           id: cached.id,
@@ -159,6 +189,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           storeName: cached.storeName,
           logoUrl: cached.logoUrl,
           primaryColor: cached.primaryColor ?? DEFAULT_TENANT.primaryColor,
+          package: pkg,
         });
       } else {
         setTenant(DEFAULT_TENANT);

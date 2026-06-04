@@ -58,10 +58,10 @@ interface ShippingConfig {
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const defaultStoreInfo: StoreInfo = {
-  storeName: "Toko Ahmad Electronics", description: "Toko elektronik terpercaya dengan produk berkualitas tinggi dan harga terbaik.",
-  address: "Jl. Sudirman No. 123", city: "Jakarta Pusat", province: "DKI Jakarta",
-  postalCode: "10220", phone: "+62 812-3456-7890", email: "toko.ahmad@email.com",
-  website: "www.tokoahmad.com", operationalHours: "Senin - Sabtu, 08:00 - 20:00", logo: null,
+  storeName: "", description: "",
+  address: "", city: "", province: "",
+  postalCode: "", phone: "", email: "",
+  website: "", operationalHours: "", logo: null,
 };
 
 const defaultNotifications: NotificationSettings = {
@@ -70,7 +70,8 @@ const defaultNotifications: NotificationSettings = {
 };
 
 const defaultDecoration: StoreDecoration = {
-  themeColor: "#3b82f6", tagline: "Elektronik Terbaik, Harga Terjangkau!",
+  // #6366f1 = primary_color default saat tenant baru dibuat
+  themeColor: "#6366f1", tagline: "",
   bannerImage: null, showReviews: true, showBestSellers: true,
 };
 
@@ -87,8 +88,8 @@ const DEFAULT_COURIERS: CourierService[] = [
 
 const defaultShipping: ShippingConfig = {
   couriers: DEFAULT_COURIERS,
-  freeShippingMin: "500000",
-  packagingFee: "5000",
+  freeShippingMin: "0",
+  packagingFee: "0",
   processingDays: "1",
 };
 
@@ -135,9 +136,19 @@ const MOCK_SESSIONS = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function mapApiStore(s: ApiStore) {
-  // GET /api/store returns store_settings.* + tenants{store_name, logo_url, primary_color}
-  // store_name dan logo_url ada di dalam nested tenants, bukan top-level store_settings
-  const tenant = (s as unknown as { tenants?: { store_name?: string; logo_url?: string; primary_color?: string } }).tenants ?? {};
+  // GET /api/store returns store_settings.* + nested tenants{...}
+  // store_name, logo_url, primary_color, owner_name ada di tenants, bukan top-level
+  const tenant = (s as unknown as {
+    tenants?: {
+      id?: string | number;
+      store_name?: string;
+      owner_name?: string;
+      logo_url?: string | null;
+      primary_color?: string | null;
+      subdomain?: string;
+      packages?: { id?: string };
+    }
+  }).tenants ?? {};
   return {
     storeInfo: {
       storeName:        s.store_name ?? tenant.store_name ?? s.name ?? defaultStoreInfo.storeName,

@@ -29,7 +29,10 @@ interface ApiProfile {
     store_name: string;
     subdomain: string;
     logo_url: string | null;
+    primary_color?: string | null;
     status: string;
+    package_id?: string | null;
+    packages?: { id?: string };
   };
 }
 
@@ -100,6 +103,7 @@ export interface CachedStore {
   subdomain: string;
   logoUrl?: string;
   primaryColor?: string;
+  packageId?: string;
 }
 
 function saveUserCache(user: AuthUser): void {
@@ -166,6 +170,8 @@ function extractSession(d: UnwrappedLoginData): AuthSession | null {
         storeName: profile.tenants.store_name,
         subdomain: profile.tenants.subdomain,
         logoUrl: profile.tenants.logo_url ?? undefined,
+        primaryColor: profile.tenants.primary_color ?? undefined,
+        packageId: profile.tenants.packages?.id ?? profile.tenants.package_id ?? undefined,
       });
     }
 
@@ -251,6 +257,8 @@ export async function apiMe(token: string): Promise<AuthUser | null> {
           storeName: profile.tenants.store_name,
           subdomain: profile.tenants.subdomain,
           logoUrl: profile.tenants.logo_url ?? undefined,
+          primaryColor: profile.tenants.primary_color ?? undefined,
+          packageId: profile.tenants.packages?.id ?? profile.tenants.package_id ?? undefined,
         });
       }
       return user;
