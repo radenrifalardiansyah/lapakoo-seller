@@ -1,8 +1,5 @@
 // ─── Centralized HTTP client untuk semua request ke backend API ──────────────
-// Semua komponen dan service harus pakai fungsi ini, bukan fetch() langsung.
 
-// Saat development, Vite proxy meneruskan /api/* ke API server (bypass CORS).
-// Saat production build, gunakan URL penuh.
 export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const TOKEN_KEY         = 'auth.token';
@@ -15,6 +12,10 @@ function getToken(): string | null {
 
 function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function getExpiresAt(): number {
+  return Number(localStorage.getItem(EXPIRES_KEY) ?? 0);
 }
 
 function saveNewTokens(accessToken: string, refreshToken: string, expiresAt: number): void {
@@ -48,28 +49,51 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   _isRetry?: boolean;
 };
 
+// Lock untuk mencegah concurrent refresh attempts
+let refreshPromise: Promise<string | null> | null = null;
+
 async function attemptRefresh(): Promise<string | null> {
+  // Gunakan promise yang sama jika refresh sedang berjalan
+  if (refreshPromise) return refreshPromise;
+
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    if (!res.ok) return null;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
 
-    const json = await res.json();
-    const data = json?.data ?? json;
-    if (data?.access_token) {
-      saveNewTokens(data.access_token, data.refresh_token ?? refreshToken, data.expires_at ?? 0);
-      return data.access_token;
+      // Endpoint belum ada (404) atau server error → jangan logout, gagal senyap
+      if (res.status === 404 || res.status >= 500) return null;
+
+      // Refresh token tidak valid (401) → logout
+      if (res.status === 401) {
+        clearAllTokens();
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        return null;
+      }
+
+      if (!res.ok) return null;
+
+      const json = await res.json();
+      const data = json?.data ?? json;
+      if (data?.access_token) {
+        saveNewTokens(data.access_token, data.refresh_token ?? refreshToken, data.expires_at ?? 0);
+        return data.access_token as string;
+      }
+    } catch {
+      // Network error — jangan logout
     }
-  } catch {
-    // refresh gagal
-  }
-  return null;
+    return null;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
 }
 
 export async function apiRequest<T = unknown>(
@@ -94,18 +118,24 @@ export async function apiRequest<T = unknown>(
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  // Auto-refresh token saat dapat 401 (token expired)
+  // Tangani 401 dengan percobaan refresh token
   if (res.status === 401 && !skipAuth && !_isRetry) {
-    const newToken = await attemptRefresh();
-    if (newToken) {
-      // Retry request sekali dengan token baru
-      return apiRequest<T>(path, { ...options, _isRetry: true });
-    } else {
-      // Refresh gagal — clear session dan notify app untuk logout
-      clearAllTokens();
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
-      throw new ApiError(401, 'Sesi berakhir. Silakan login kembali.');
+    const tokenExpired = getExpiresAt() <= Date.now();
+
+    if (tokenExpired || getRefreshToken()) {
+      const newToken = await attemptRefresh();
+      if (newToken) {
+        // Retry dengan token baru
+        return apiRequest<T>(path, { ...options, _isRetry: true });
+      }
     }
+
+    // Jika token expired dan refresh gagal → logout
+    if (tokenExpired && !getToken()) {
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
+
+    throw new ApiError(401, 'Sesi berakhir. Silakan login kembali.');
   }
 
   if (!res.ok) {
@@ -125,23 +155,18 @@ export async function apiRequest<T = unknown>(
     throw new ApiError(res.status, errorMessage, errorBody);
   }
 
-  // 204 No Content
   if (res.status === 204) return undefined as T;
 
   const json = await res.json();
 
   if (json && typeof json === 'object') {
-    // Backend ini selalu mengembalikan { success: bool, data/error: ... }
-    // Unwrap data jika success=true
     if ('success' in json && 'data' in json) {
       if ((json as { success: boolean }).success === true) {
         return (json as { success: boolean; data: T }).data;
       }
-      // success=false dengan HTTP 200 — perlakukan sebagai error
       const errMsg = (json as { error?: string }).error ?? 'Request gagal';
       throw new ApiError(res.status, errMsg, json);
     }
-    // Format lama: { data: ... } tanpa field success
     if ('data' in json && Object.keys(json).length === 1) {
       return (json as { data: T }).data;
     }
