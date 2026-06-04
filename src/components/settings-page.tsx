@@ -198,10 +198,13 @@ export function SettingsPage() {
       setDecoration(deco); setDecoDraft(deco);
       setShipping(ship);   setShippingDraft(ship);
       setNotifications(notifs);
-      setStoreCategories(cats ?? []);
+      const catList = cats ?? [];
+      setStoreCategories(catList);
       const catId = currentCat?.store_category_id ?? "";
       setStoreCategoryId(catId);
       setCatDraft(catId);
+      const catObj = currentCat?.store_categories ?? catList.find(c => c.id === catId) ?? null;
+      setCurrentCategoryObj(catObj);
     }).catch(() => { /* gunakan default */ })
       .finally(() => setSettingsLoading(false));
   }, []);
@@ -225,7 +228,9 @@ export function SettingsPage() {
   // ── Kategori Toko ──
   const [storeCategories, setStoreCategories]   = useState<ApiStoreCategory[]>([]);
   const [storeCategoryId, setStoreCategoryId]   = useState<string>("");
+  const [currentCategoryObj, setCurrentCategoryObj] = useState<ApiStoreCategory | null>(null);
   const [catDraft, setCatDraft]                 = useState<string>("");
+  const [catEditing, setCatEditing]             = useState(false);
   const [catSaved, setCatSaved]                 = useState(false);
   const [savingCat, setSavingCat]               = useState(false);
 
@@ -328,6 +333,9 @@ export function SettingsPage() {
     try {
       await storeCategoriesApi.update(catDraft);
       setStoreCategoryId(catDraft);
+      const selected = storeCategories.find(c => c.id === catDraft) ?? null;
+      setCurrentCategoryObj(selected);
+      setCatEditing(false);
       setCatSaved(true);
       setTimeout(() => setCatSaved(false), 3000);
     } catch {
@@ -490,23 +498,55 @@ export function SettingsPage() {
               <Label className="flex items-center gap-1.5 text-sm font-medium">
                 <Tag className="w-3.5 h-3.5" />Kategori Toko
               </Label>
-              {catSaved && (
-                <span className="flex items-center gap-1.5 text-xs text-green-600">
-                  <CheckCircle2 className="w-3.5 h-3.5" />Tersimpan
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {catSaved && (
+                  <span className="flex items-center gap-1.5 text-xs text-green-600">
+                    <CheckCircle2 className="w-3.5 h-3.5" />Tersimpan
+                  </span>
+                )}
+                {!catEditing ? (
+                  <Button size="sm" variant="outline" onClick={() => { setCatDraft(storeCategoryId); setCatEditing(true); }}>
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" />Ubah
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { setCatDraft(storeCategoryId); setCatEditing(false); }}>
+                      <X className="w-3.5 h-3.5 mr-1.5" />Batal
+                    </Button>
+                    <Button size="sm" onClick={handleCatSave} disabled={savingCat || !catDraft || catDraft === storeCategoryId}>
+                      {savingCat ? "Menyimpan…" : <><Check className="w-3.5 h-3.5 mr-1.5" />Simpan</>}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
               Jenis produk utama yang dijual di toko Anda
             </p>
-            <div className="flex items-center gap-3">
+
+            {!catEditing ? (
+              settingsLoading ? (
+                <div className="h-9 w-48 rounded-md bg-muted animate-pulse" />
+              ) : currentCategoryObj ? (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-sm px-3 py-1">
+                    <Tag className="w-3 h-3 mr-1.5" />{currentCategoryObj.name}
+                  </Badge>
+                  {currentCategoryObj.description && (
+                    <p className="text-xs text-muted-foreground">{currentCategoryObj.description}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-1">Belum ada kategori dipilih</p>
+              )
+            ) : (
               <Select
                 value={catDraft}
                 onValueChange={setCatDraft}
                 disabled={storeCategories.length === 0}
               >
                 <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Pilih kategori toko…" />
+                  <SelectValue placeholder={storeCategories.length === 0 ? "Tidak ada kategori tersedia" : "Pilih kategori toko…"} />
                 </SelectTrigger>
                 <SelectContent>
                   {storeCategories.map(cat => (
@@ -516,18 +556,7 @@ export function SettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                size="sm"
-                onClick={handleCatSave}
-                disabled={savingCat || !catDraft || catDraft === storeCategoryId}
-              >
-                {savingCat ? (
-                  <span className="flex items-center gap-1.5">Menyimpan…</span>
-                ) : (
-                  <><Check className="w-3.5 h-3.5 mr-1.5" />Simpan</>
-                )}
-              </Button>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
