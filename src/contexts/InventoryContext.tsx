@@ -116,7 +116,7 @@ function buildDistributionFromApi(
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
-  const [warehouses, setWarehouses] = useState<WarehouseLocation[]>(DEFAULT_WAREHOUSES)
+  const [warehouses, setWarehouses] = useState<WarehouseLocation[]>([])
   const [distribution, setDistribution] = useState<Record<number, Record<string, number>>>({})
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,13 +134,11 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     try {
       const [apiProducts, apiWarehouses] = await Promise.all([
         productsApi.list(),
-        warehousesApi.list().catch(() => [] as ApiWarehouse[]),
+        warehousesApi.list(),
       ])
 
       const mapped = apiProducts.map(mapApiProduct)
-      const mappedWh = apiWarehouses.length > 0
-        ? apiWarehouses.map(mapApiWarehouse)
-        : DEFAULT_WAREHOUSES
+      const mappedWh = apiWarehouses.map(mapApiWarehouse)
 
       setWarehouses(mappedWh)
 
