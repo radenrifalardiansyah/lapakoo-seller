@@ -32,7 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await apiMe(storedToken);
         if (cancelled) return;
         if (me) {
-          setToken(storedToken);
+          // Token mungkin sudah diperbarui oleh auto-refresh di api-client
+          const currentToken = localStorage.getItem(TOKEN_KEY) ?? storedToken;
+          setToken(currentToken);
           setUser(me);
         } else {
           localStorage.removeItem(TOKEN_KEY);
@@ -48,6 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     restore();
     return () => { cancelled = true; };
+  }, []);
+
+  // Auto-logout saat token tidak bisa di-refresh (event dari api-client)
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setToken(null);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

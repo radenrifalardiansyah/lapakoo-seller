@@ -91,10 +91,21 @@ interface MeApiResponse {
 
 // ─── localStorage cache (agar session restore tidak bergantung pada /api/auth/me) ──
 
-const USER_CACHE_KEY = 'auth.user';
+const USER_CACHE_KEY   = 'auth.user';
+const REFRESH_TOKEN_KEY = 'auth.refresh_token';
 
 // Diexport agar TenantContext bisa baca tenant dari login response
 export const STORE_CACHE_KEY = 'auth.store';
+
+export function saveRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+export function loadRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+export function clearRefreshToken(): void {
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
 
 export interface CachedStore {
   id: string;
@@ -131,6 +142,7 @@ export function loadStoreCache(): CachedStore | null {
 export function clearAuthCache(): void {
   localStorage.removeItem(USER_CACHE_KEY);
   localStorage.removeItem(STORE_CACHE_KEY);
+  clearRefreshToken();
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -163,6 +175,7 @@ function extractSession(d: UnwrappedLoginData): AuthSession | null {
     };
 
     saveUserCache(user);
+    if (d.session.refresh_token) saveRefreshToken(d.session.refresh_token);
     if (profile.tenants) {
       saveStoreCache({
         id: String(profile.tenants.id),

@@ -5,10 +5,30 @@
 // Saat production build, gunakan URL penuh.
 export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
-const TOKEN_KEY = 'auth.token';
+const TOKEN_KEY         = 'auth.token';
+const EXPIRES_KEY       = 'auth.expiresAt';
+const REFRESH_TOKEN_KEY = 'auth.refresh_token';
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function saveNewTokens(accessToken: string, refreshToken: string, expiresAt: number): void {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  localStorage.setItem(EXPIRES_KEY, String(expiresAt * 1000));
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+function clearAllTokens(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(EXPIRES_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('auth.user');
+  localStorage.removeItem('auth.store');
 }
 
 export class ApiError extends Error {
@@ -25,13 +45,38 @@ export class ApiError extends Error {
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   skipAuth?: boolean;
+  _isRetry?: boolean;
 };
+
+async function attemptRefresh(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const data = json?.data ?? json;
+    if (data?.access_token) {
+      saveNewTokens(data.access_token, data.refresh_token ?? refreshToken, data.expires_at ?? 0);
+      return data.access_token;
+    }
+  } catch {
+    // refresh gagal
+  }
+  return null;
+}
 
 export async function apiRequest<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { body, skipAuth = false, ...rest } = options;
+  const { body, skipAuth = false, _isRetry = false, ...rest } = options;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -48,6 +93,20 @@ export async function apiRequest<T = unknown>(
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  // Auto-refresh token saat dapat 401 (token expired)
+  if (res.status === 401 && !skipAuth && !_isRetry) {
+    const newToken = await attemptRefresh();
+    if (newToken) {
+      // Retry request sekali dengan token baru
+      return apiRequest<T>(path, { ...options, _isRetry: true });
+    } else {
+      // Refresh gagal — clear session dan notify app untuk logout
+      clearAllTokens();
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      throw new ApiError(401, 'Sesi berakhir. Silakan login kembali.');
+    }
+  }
 
   if (!res.ok) {
     let errorMessage = `HTTP ${res.status}`;
