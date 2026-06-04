@@ -135,9 +135,12 @@ const MOCK_SESSIONS = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function mapApiStore(s: ApiStore) {
+  // GET /api/store returns store_settings.* + tenants{store_name, logo_url, primary_color}
+  // store_name dan logo_url ada di dalam nested tenants, bukan top-level store_settings
+  const tenant = (s as unknown as { tenants?: { store_name?: string; logo_url?: string; primary_color?: string } }).tenants ?? {};
   return {
     storeInfo: {
-      storeName:        s.store_name ?? s.name              ?? defaultStoreInfo.storeName,
+      storeName:        s.store_name ?? tenant.store_name ?? s.name ?? defaultStoreInfo.storeName,
       description:      s.description                        ?? defaultStoreInfo.description,
       address:          s.address                            ?? defaultStoreInfo.address,
       city:             s.city                               ?? defaultStoreInfo.city,
@@ -147,10 +150,10 @@ function mapApiStore(s: ApiStore) {
       email:            s.email                              ?? defaultStoreInfo.email,
       website:          s.website                            ?? defaultStoreInfo.website,
       operationalHours: s.operational_hours                  ?? defaultStoreInfo.operationalHours,
-      logo:             s.logo_url ?? s.logo                 ?? defaultStoreInfo.logo,
+      logo:             s.logo_url ?? tenant.logo_url ?? s.logo ?? defaultStoreInfo.logo,
     } as StoreInfo,
     decoration: {
-      themeColor:     s.theme_color                          ?? defaultDecoration.themeColor,
+      themeColor:     s.theme_color ?? tenant.primary_color ?? defaultDecoration.themeColor,
       tagline:        s.tagline                              ?? defaultDecoration.tagline,
       bannerImage:    s.banner_url ?? s.banner_image         ?? defaultDecoration.bannerImage,
       showReviews:    s.show_reviews                         ?? defaultDecoration.showReviews,
@@ -185,28 +188,32 @@ export function SettingsPage() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load all settings from API on mount
+  // Load all settings from API on mount — pakai allSettled agar kegagalan satu call
+  // tidak menghentikan call lainnya (mis. store 404 tidak blokir kategori)
   useEffect(() => {
     setSettingsLoading(true);
-    Promise.all([
+    Promise.allSettled([
       storeApi.get(),
       storeCategoriesApi.list(),
       storeCategoriesApi.getCurrent(),
-    ]).then(([apiStore, cats, currentCat]) => {
-      const { storeInfo: info, decoration: deco, shipping: ship, notifications: notifs } = mapApiStore(apiStore);
-      setStoreInfo(info);  setFormData(info);
-      setDecoration(deco); setDecoDraft(deco);
-      setShipping(ship);   setShippingDraft(ship);
-      setNotifications(notifs);
-      const catList = cats ?? [];
+    ]).then(([storeResult, catsResult, currentCatResult]) => {
+      if (storeResult.status === 'fulfilled') {
+        const { storeInfo: info, decoration: deco, shipping: ship, notifications: notifs } = mapApiStore(storeResult.value);
+        setStoreInfo(info);  setFormData(info);
+        setDecoration(deco); setDecoDraft(deco);
+        setShipping(ship);   setShippingDraft(ship);
+        setNotifications(notifs);
+      }
+      const catList = catsResult.status === 'fulfilled' ? (catsResult.value ?? []) : [];
       setStoreCategories(catList);
-      const catId = currentCat?.store_category_id ?? "";
-      setStoreCategoryId(catId);
-      setCatDraft(catId);
-      const catObj = currentCat?.store_categories ?? catList.find(c => c.id === catId) ?? null;
-      setCurrentCategoryObj(catObj);
-    }).catch(() => { /* gunakan default */ })
-      .finally(() => setSettingsLoading(false));
+      if (currentCatResult.status === 'fulfilled') {
+        const catId = currentCatResult.value?.store_category_id ?? "";
+        setStoreCategoryId(catId);
+        setCatDraft(catId);
+        const catObj = currentCatResult.value?.store_categories ?? catList.find(c => c.id === catId) ?? null;
+        setCurrentCategoryObj(catObj);
+      }
+    }).finally(() => setSettingsLoading(false));
   }, []);
 
   // ── Notifikasi ──
@@ -217,6 +224,8 @@ export function SettingsPage() {
   const [decoEditing, setDecoEditing]     = useState(false);
   const [decoDraft, setDecoDraft]         = useState<StoreDecoration>(defaultDecoration);
   const [decoSaved, setDecoSaved]         = useState(false);
+  const [decoError, setDecoError]         = useState("");
+  const [savingDeco, setSavingDeco]       = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
 
   // ── Pengiriman ──
@@ -224,6 +233,7 @@ export function SettingsPage() {
   const [shippingEditing, setShippingEditing] = useState(false);
   const [shippingDraft, setShippingDraft] = useState<ShippingConfig>(defaultShipping);
   const [shippingSaved, setShippingSaved] = useState(false);
+  const [shippingError, setShippingError] = useState("");
 
   // ── Kategori Toko ──
   const [storeCategories, setStoreCategories]   = useState<ApiStoreCategory[]>([]);
@@ -289,6 +299,8 @@ export function SettingsPage() {
 
   // ── Dekorasi handlers ──
   const handleDecoSave = async () => {
+    setSavingDeco(true);
+    setDecoError("");
     try {
       await storeApi.update({
         theme_color:      decoDraft.themeColor,
@@ -297,9 +309,15 @@ export function SettingsPage() {
         show_reviews:     decoDraft.showReviews,
         show_best_sellers:decoDraft.showBestSellers,
       });
-    } catch {}
-    setDecoration({ ...decoDraft }); setDecoEditing(false); setDecoSaved(true);
-    setTimeout(() => setDecoSaved(false), 3000);
+      setDecoration({ ...decoDraft });
+      setDecoEditing(false);
+      setDecoSaved(true);
+      setTimeout(() => setDecoSaved(false), 3000);
+    } catch (err) {
+      setDecoError(err instanceof Error ? err.message : "Gagal menyimpan dekorasi");
+    } finally {
+      setSavingDeco(false);
+    }
   };
   const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -315,15 +333,20 @@ export function SettingsPage() {
       ...p, couriers: p.couriers.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c),
     }));
   const handleShippingSave = async () => {
+    setShippingError("");
     try {
       await storeApi.update({
         free_shipping_min: Number(shippingDraft.freeShippingMin) || 0,
         packaging_fee:     Number(shippingDraft.packagingFee)    || 0,
         processing_days:   Number(shippingDraft.processingDays)  || 1,
       });
-    } catch {}
-    setShipping({ ...shippingDraft }); setShippingEditing(false); setShippingSaved(true);
-    setTimeout(() => setShippingSaved(false), 3000);
+      setShipping({ ...shippingDraft });
+      setShippingEditing(false);
+      setShippingSaved(true);
+      setTimeout(() => setShippingSaved(false), 3000);
+    } catch (err) {
+      setShippingError(err instanceof Error ? err.message : "Gagal menyimpan pengaturan pengiriman");
+    }
   };
 
   // ── Kategori Toko handler ──
@@ -577,16 +600,16 @@ export function SettingsPage() {
                 </span>
               )}
               {!decoEditing ? (
-                <Button size="sm" onClick={() => { setDecoDraft({ ...decoration }); setDecoEditing(true); }}>
+                <Button size="sm" onClick={() => { setDecoDraft({ ...decoration }); setDecoEditing(true); setDecoError(""); }}>
                   <Pencil className="w-4 h-4 mr-1.5" />Edit Dekorasi
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setDecoEditing(false)}>
+                  <Button size="sm" variant="outline" onClick={() => { setDecoEditing(false); setDecoError(""); }}>
                     <X className="w-4 h-4 mr-1.5" />Batal
                   </Button>
-                  <Button size="sm" onClick={handleDecoSave}>
-                    <Check className="w-4 h-4 mr-1.5" />Simpan
+                  <Button size="sm" onClick={handleDecoSave} disabled={savingDeco}>
+                    <Check className="w-4 h-4 mr-1.5" />{savingDeco ? "Menyimpan…" : "Simpan"}
                   </Button>
                 </div>
               )}
@@ -711,9 +734,16 @@ export function SettingsPage() {
           </div>
 
           {decoEditing && (
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={() => setDecoEditing(false)}><X className="w-4 h-4 mr-2" />Batal</Button>
-              <Button onClick={handleDecoSave}><Check className="w-4 h-4 mr-2" />Simpan Dekorasi</Button>
+            <div className="space-y-3 pt-2 border-t">
+              {decoError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{decoError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setDecoEditing(false); setDecoError(""); }}><X className="w-4 h-4 mr-2" />Batal</Button>
+                <Button onClick={handleDecoSave} disabled={savingDeco}><Check className="w-4 h-4 mr-2" />{savingDeco ? "Menyimpan…" : "Simpan Dekorasi"}</Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -834,9 +864,16 @@ export function SettingsPage() {
           </div>
 
           {shippingEditing && (
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={() => setShippingEditing(false)}><X className="w-4 h-4 mr-2" />Batal</Button>
-              <Button onClick={handleShippingSave}><Check className="w-4 h-4 mr-2" />Simpan Pengiriman</Button>
+            <div className="space-y-3 pt-2 border-t">
+              {shippingError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{shippingError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setShippingEditing(false); setShippingError(""); }}><X className="w-4 h-4 mr-2" />Batal</Button>
+                <Button onClick={handleShippingSave}><Check className="w-4 h-4 mr-2" />Simpan Pengiriman</Button>
+              </div>
             </div>
           )}
         </CardContent>
