@@ -302,6 +302,9 @@ function WithdrawDialog({ open, onClose, balance }: { open: boolean; onClose: ()
           </div>
         ) : (
           <div className="space-y-4 py-2">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              Fitur penarikan saldo sedang dalam pengembangan. Hubungi admin untuk penarikan manual.
+            </div>
             <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Saldo Tersedia</span>
               <span className="font-semibold text-green-600">{formatPrice(balance)}</span>
@@ -344,7 +347,7 @@ function WithdrawDialog({ open, onClose, balance }: { open: boolean; onClose: ()
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={handleClose}>Batal</Button>
-              <Button onClick={handleSubmit} disabled={!isValid}>
+              <Button onClick={handleSubmit} disabled={true} title="Fitur dalam pengembangan">
                 <ArrowDownToLine className="w-4 h-4 mr-1.5" />Konfirmasi Penarikan
               </Button>
             </div>
@@ -628,7 +631,7 @@ export function PaymentsPage() {
         </Card>
         <Card className="flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium truncate">Total Penarikan</CardTitle>
+            <CardTitle className="text-sm font-medium truncate">Total Pendapatan</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent className="flex flex-col flex-1">
@@ -973,9 +976,7 @@ export function PaymentsPage() {
                 <SelectContent>
                   <SelectItem value="all">Semua Jenis</SelectItem>
                   <SelectItem value="Penjualan">Penjualan</SelectItem>
-                  <SelectItem value="Penarikan">Penarikan</SelectItem>
                   <SelectItem value="Refund">Refund</SelectItem>
-                  <SelectItem value="Biaya Admin">Biaya Admin</SelectItem>
                 </SelectContent>
               </Select>
               {hasFeature('export-data') && (

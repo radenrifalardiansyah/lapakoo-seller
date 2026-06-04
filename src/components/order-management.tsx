@@ -1159,6 +1159,7 @@ export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersError, setOrdersError] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('all')
 
@@ -1179,8 +1180,7 @@ export function OrderManagement() {
       setOrders(data.map(mapApiOrder))
     } catch (err) {
       setOrdersError(err instanceof Error ? err.message : 'Gagal memuat pesanan')
-      // Fallback ke mock data agar UI tetap berfungsi saat API belum live
-      setOrders(initialOrders)
+      setOrders([])
     } finally {
       setOrdersLoading(false)
     }
@@ -1236,6 +1236,7 @@ export function OrderManagement() {
 
   // ── handlers ──
   const handleUpdateStatus = (id: string, status: OrderStatus, extra?: { trackingNumber?: string; courier?: string }) => {
+    const prevOrders = orders
     const patch = {
       ...extra,
       ...(status === 'delivered' ? { deliveryDate: new Date().toISOString() } : {}),
@@ -1244,24 +1245,38 @@ export function OrderManagement() {
       o.id === id ? { ...o, status, ...patch } : o
     ))
     setViewOrder(prev => prev?.id === id ? { ...prev!, status, ...patch } : prev)
-    // Sinkronisasi ke API (optimistic)
-    ordersApi.update(id, { status, tracking_number: extra?.trackingNumber, courier: extra?.courier }).catch(() => {})
+    setMutationError(null)
+    ordersApi.update(id, {
+      status,
+      tracking_number: extra?.trackingNumber,
+      courier: extra?.courier,
+      ...(status === 'delivered' ? { delivered_at: new Date().toISOString() } : {}),
+    }).catch(err => {
+      setOrders(prevOrders)
+      setMutationError(err instanceof Error ? err.message : 'Gagal memperbarui status pesanan')
+    })
   }
 
   const handleBulkShip = (updates: { id: string; courier: string; trackingNumber: string }[]) => {
+    const prevOrders = orders
     setOrders(prev => prev.map(o => {
       const update = updates.find(u => u.id === o.id)
       if (!update) return o
       return { ...o, status: 'shipped' as OrderStatus, courier: update.courier, trackingNumber: update.trackingNumber }
     }))
-    updates.forEach(u =>
-      ordersApi.update(u.id, { status: 'shipped', courier: u.courier, tracking_number: u.trackingNumber }).catch(() => {})
-    )
+    setMutationError(null)
+    Promise.all(
+      updates.map(u => ordersApi.update(u.id, { status: 'shipped', courier: u.courier, tracking_number: u.trackingNumber }))
+    ).catch(err => {
+      setOrders(prevOrders)
+      setMutationError(err instanceof Error ? err.message : 'Gagal memproses pengiriman massal')
+    })
     setSelectedIds(new Set())
     setBulkShipOrders([])
   }
 
   const handleCancelOrders = (ids: string[], reason: string) => {
+    const prevOrders = orders
     setOrders(prev => prev.map(o => {
       if (!ids.includes(o.id)) return o
       return {
@@ -1271,22 +1286,32 @@ export function OrderManagement() {
         cancelReason: reason,
       }
     }))
-    ids.forEach(id => ordersApi.update(id, { status: 'cancelled', cancel_reason: reason }).catch(() => {}))
+    setMutationError(null)
+    Promise.all(ids.map(id => ordersApi.update(id, { status: 'cancelled', cancel_reason: reason }))).catch(err => {
+      setOrders(prevOrders)
+      setMutationError(err instanceof Error ? err.message : 'Gagal membatalkan pesanan')
+    })
     setSelectedIds(new Set())
     setCancelOrders([])
   }
 
   const handleReturRequest = (id: string, request: ReturnRequest) => {
+    const prevOrders = orders
     setOrders(prev => prev.map(o => o.id === id ? { ...o, returnRequest: request } : o))
+    setMutationError(null)
     ordersApi.createReturn(id, {
       type: request.type,
       reason: request.reason,
       notes: request.notes,
       status: request.status,
-    }).catch(() => {})
+    }).catch(err => {
+      setOrders(prevOrders)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mengajukan retur')
+    })
   }
 
   const handleReturStatusUpdate = (id: string, status: ReturStatus) => {
+    const prevOrders = orders
     setOrders(prev => prev.map(o =>
       o.id === id && o.returnRequest
         ? { ...o, returnRequest: { ...o.returnRequest, status } }
@@ -1297,7 +1322,11 @@ export function OrderManagement() {
         ? { ...prev, returnRequest: { ...prev.returnRequest, status } }
         : prev
     )
-    ordersApi.updateReturn(id, { status }).catch(() => {})
+    setMutationError(null)
+    ordersApi.updateReturn(id, { status }).catch(err => {
+      setOrders(prevOrders)
+      setMutationError(err instanceof Error ? err.message : 'Gagal memperbarui status retur')
+    })
   }
 
   // ── export ──
@@ -1383,9 +1412,15 @@ export function OrderManagement() {
   return (
     <div className="space-y-6">
       {ordersError && (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700">
-          <span><AlertCircle className="w-4 h-4 inline mr-1.5" />Gagal terhubung ke server — menampilkan data contoh</span>
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span><AlertCircle className="w-4 h-4 inline mr-1.5" />{ordersError}</span>
           <Button variant="outline" size="sm" onClick={loadOrders}>Muat Ulang</Button>
+        </div>
+      )}
+      {mutationError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span><AlertCircle className="w-4 h-4 inline mr-1.5" />{mutationError}</span>
+          <button className="text-red-500 hover:text-red-700" onClick={() => setMutationError(null)}>✕</button>
         </div>
       )}
       {/* Header */}

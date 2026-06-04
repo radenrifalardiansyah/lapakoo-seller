@@ -195,8 +195,9 @@ export function SettingsPage() {
   const [formData, setFormData]     = useState<StoreInfo>(defaultStoreInfo);
   const [isEditing, setIsEditing]   = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError]   = useState("");
   const [savingStore, setSavingStore] = useState(false);
-  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load all settings from API on mount — pakai allSettled agar kegagalan satu call
@@ -271,32 +272,34 @@ export function SettingsPage() {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   // ── Profil handlers ──
-  const handleEditStart = () => { setFormData({ ...storeInfo }); setIsEditing(true); setSaveSuccess(false); };
-  const handleCancel    = () => { setFormData({ ...storeInfo }); setIsEditing(false); };
+  const handleEditStart = () => { setFormData({ ...storeInfo }); setIsEditing(true); setSaveSuccess(false); setSaveError(""); };
+  const handleCancel    = () => { setFormData({ ...storeInfo }); setIsEditing(false); setSaveError(""); };
   const handleSave      = async () => {
-    setSavingStore(true)
+    setSavingStore(true);
+    setSaveError("");
     try {
-      const payload: ApiStore = {
-        store_name: formData.storeName,
-        description: formData.description,
-        address: formData.address,
-        city: formData.city,
-        province: formData.province,
-        postal_code: formData.postalCode,
-        phone: formData.phone,
-        email: formData.email,
-        website: formData.website,
+      await storeApi.update({
+        store_name:        formData.storeName,
+        description:       formData.description,
+        address:           formData.address,
+        city:              formData.city,
+        province:          formData.province,
+        postal_code:       formData.postalCode,
+        phone:             formData.phone,
+        email:             formData.email,
+        website:           formData.website,
         operational_hours: formData.operationalHours,
-        logo_url: formData.logo ?? undefined,
-      }
-      await storeApi.update(payload)
-    } catch {
-      // Simpan lokal meskipun API gagal
+        logo_url:          formData.logo ?? undefined,
+      });
+      setStoreInfo({ ...formData });
+      setIsEditing(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Gagal menyimpan informasi toko");
     } finally {
-      setSavingStore(false)
+      setSavingStore(false);
     }
-    setStoreInfo({ ...formData }); setIsEditing(false); setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
   };
   const handleChange = (field: keyof StoreInfo, value: string) =>
     setFormData(p => ({ ...p, [field]: value }));
@@ -518,9 +521,16 @@ export function SettingsPage() {
           </div>
 
           {isEditing && (
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={handleCancel}><X className="w-4 h-4 mr-2" />Batal</Button>
-              <Button onClick={handleSave} disabled={savingStore}><Check className="w-4 h-4 mr-2" />{savingStore ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
+            <div className="space-y-3 pt-2 border-t">
+              {saveError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{saveError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleCancel}><X className="w-4 h-4 mr-2" />Batal</Button>
+                <Button onClick={handleSave} disabled={savingStore}><Check className="w-4 h-4 mr-2" />{savingStore ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
+              </div>
             </div>
           )}
 

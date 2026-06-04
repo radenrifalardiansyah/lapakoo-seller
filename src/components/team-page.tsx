@@ -70,12 +70,17 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
     return errs
   }
 
+  const [submitError, setSubmitError] = useState('')
+
   const handleSubmit = async () => {
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setSaving(true)
+    setSubmitError('')
     try {
       await onSave({ name: name.trim(), email: email.trim(), role, status, password: password || undefined })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Gagal menyimpan. Coba lagi.')
     } finally {
       setSaving(false)
     }
@@ -205,6 +210,11 @@ function UserDialog({ user, onSave, onClose, primaryColor }: UserDialogProps) {
           )}
         </div>
 
+        {submitError && (
+          <div className="mx-6 mb-2 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            {submitError}
+          </div>
+        )}
         <div className="flex gap-2 px-6 py-4 border-t">
           <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Batal</Button>
           <Button

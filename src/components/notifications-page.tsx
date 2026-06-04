@@ -59,9 +59,11 @@ function NotifSkeleton() {
 function NotifItem({
   n,
   onMarkRead,
+  isMarking,
 }: {
   n: ApiNotification
   onMarkRead: (id: number | string) => void
+  isMarking?: boolean
 }) {
   const unread = isUnread(n)
   const cfg    = typeConfig(n.type)
@@ -100,9 +102,10 @@ function NotifItem({
         {unread && (
           <button
             onClick={() => onMarkRead(n.id)}
-            className="text-[10px] text-blue-600 hover:underline whitespace-nowrap"
+            disabled={isMarking}
+            className="text-[10px] text-blue-600 hover:underline whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Tandai dibaca
+            {isMarking ? '...' : 'Tandai dibaca'}
           </button>
         )}
       </div>
@@ -139,12 +142,18 @@ export function NotificationsPage({ onUnreadCountChange }: NotificationsPageProp
 
   useEffect(() => { load() }, [load])
 
+  const [markingIds, setMarkingIds] = useState<Set<string | number>>(new Set())
+
   const handleMarkRead = (id: number | string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, status: 'read' as const, is_read: true, read: true } : n)
-    )
-    notificationsApi.markRead(id).catch(() => load())
-    onUnreadCountChange?.(notifications.filter(n => n.id !== id && isUnread(n)).length)
+    if (markingIds.has(id)) return
+    setMarkingIds(prev => new Set([...prev, id]))
+    const updated = notifications.map(n => n.id === id ? { ...n, status: 'read' as const, is_read: true, read: true } : n)
+    setNotifications(updated)
+    // Hitung count dari array yang sudah diupdate, bukan dari stale closure
+    onUnreadCountChange?.(updated.filter(isUnread).length)
+    notificationsApi.markRead(id)
+      .catch(() => load())
+      .finally(() => setMarkingIds(prev => { const s = new Set(prev); s.delete(id); return s }))
   }
 
   const handleMarkAllRead = async () => {
@@ -241,7 +250,7 @@ export function NotificationsPage({ onUnreadCountChange }: NotificationsPageProp
                 ) : (
                   <div className="space-y-2">
                     {displayed.map(n => (
-                      <NotifItem key={n.id} n={n} onMarkRead={handleMarkRead} />
+                      <NotifItem key={n.id} n={n} onMarkRead={handleMarkRead} isMarking={markingIds.has(n.id)} />
                     ))}
                   </div>
                 )}

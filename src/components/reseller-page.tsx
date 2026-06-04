@@ -879,6 +879,7 @@ export function ResellerPage() {
   const [resellers, setResellers]         = useState<Reseller[]>([])
   const [resellersLoading, setResellersLoading] = useState(false)
   const [resellersError, setResellersError] = useState<string | null>(null)
+  const [mutationError, setMutationError]   = useState<string | null>(null)
   const [tierSettings, setTierSettings]   = useState<Record<ResellerTier, TierBusinessConfig>>(DEFAULT_TIER_SETTINGS)
   const [searchTerm, setSearchTerm]       = useState('')
   const [tierFilter, setTierFilter]       = useState<string>('all')
@@ -904,8 +905,8 @@ export function ResellerPage() {
       const data = await resellersApi.list()
       setResellers(data.map(mapApiReseller))
     } catch (err) {
-      setResellersError(err instanceof Error ? err.message : 'Gagal memuat reseller')
-      setResellers(initialResellers)
+      setResellersError(err instanceof Error ? err.message : 'Gagal memuat data reseller')
+      setResellers([])
     } finally {
       setResellersLoading(false)
     }
@@ -965,51 +966,81 @@ export function ResellerPage() {
 
   const handleEdit = (data: ResellerForm) => {
     if (!editReseller) return
-    setResellers(prev => prev.map(r => r.id === editReseller.id ? { ...r, ...data } : r))
+    const prev = resellers
+    setResellers(rs => rs.map(r => r.id === editReseller.id ? { ...r, ...data } : r))
+    setMutationError(null)
     resellersApi.update(editReseller.id, {
       name: data.name, email: data.email, phone: data.phone,
       city: data.city, address: data.address, notes: data.notes, tier: data.tier,
-    }).catch(() => {})
+    }).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mengubah data reseller')
+    })
   }
 
   const handleApprove = (id: string, tier: ResellerTier) => {
+    const prev = resellers
     const ref = generateReferralCode(resellers.find(r => r.id === id)?.name ?? id)
-    setResellers(prev => prev.map(r =>
+    setResellers(rs => rs.map(r =>
       r.id === id ? { ...r, status: 'active', tier, referralCode: ref } : r
     ))
-    resellersApi.update(id, { status: 'active', tier, referral_code: ref }).catch(() => {})
+    setMutationError(null)
+    resellersApi.update(id, { status: 'active', tier, referral_code: ref }).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal menyetujui reseller')
+    })
   }
 
   const handleSuspend = () => {
     if (!suspendReseller) return
-    setResellers(prev => prev.map(r => r.id === suspendReseller.id ? { ...r, status: 'suspended' } : r))
-    resellersApi.update(suspendReseller.id, { status: 'suspended' }).catch(() => {})
+    const prev = resellers
+    setResellers(rs => rs.map(r => r.id === suspendReseller.id ? { ...r, status: 'suspended' } : r))
+    setMutationError(null)
+    resellersApi.update(suspendReseller.id, { status: 'suspended' }).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal menangguhkan reseller')
+    })
     setSuspendReseller(null)
   }
 
   const handleActivate = () => {
     if (!activateReseller) return
-    setResellers(prev => prev.map(r => r.id === activateReseller.id ? { ...r, status: 'active' } : r))
-    resellersApi.update(activateReseller.id, { status: 'active' }).catch(() => {})
+    const prev = resellers
+    setResellers(rs => rs.map(r => r.id === activateReseller.id ? { ...r, status: 'active' } : r))
+    setMutationError(null)
+    resellersApi.update(activateReseller.id, { status: 'active' }).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mengaktifkan reseller')
+    })
     setActivateReseller(null)
   }
 
   const handlePayCommission = (id: string) => {
     const r = resellers.find(x => x.id === id)
     if (!r) return
-    setResellers(prev => prev.map(x =>
+    const prev = resellers
+    setResellers(rs => rs.map(x =>
       x.id === id ? { ...x, paidCommission: x.paidCommission + x.pendingCommission, pendingCommission: 0 } : x
     ))
+    setMutationError(null)
     resellersApi.update(id, {
       paid_commission: r.paidCommission + r.pendingCommission,
       pending_commission: 0,
-    }).catch(() => {})
+    }).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mencatat pembayaran komisi')
+    })
   }
 
   const handleDelete = () => {
     if (!deleteReseller) return
-    setResellers(prev => prev.filter(r => r.id !== deleteReseller.id))
-    resellersApi.remove(deleteReseller.id).catch(() => {})
+    const prev = resellers
+    setResellers(rs => rs.filter(r => r.id !== deleteReseller.id))
+    setMutationError(null)
+    resellersApi.remove(deleteReseller.id).catch(err => {
+      setResellers(prev)
+      setMutationError(err instanceof Error ? err.message : 'Gagal menghapus reseller')
+    })
     setDeleteReseller(null)
   }
 
@@ -1096,9 +1127,15 @@ export function ResellerPage() {
   return (
     <div className="space-y-6">
       {resellersError && (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700">
-          <span>Gagal terhubung ke server — menampilkan data contoh</span>
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span>{resellersError}</span>
           <Button variant="outline" size="sm" onClick={loadResellers}>Muat Ulang</Button>
+        </div>
+      )}
+      {mutationError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span>{mutationError}</span>
+          <button className="text-red-500 hover:text-red-700" onClick={() => setMutationError(null)}>✕</button>
         </div>
       )}
       {/* Header */}

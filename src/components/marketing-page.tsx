@@ -654,11 +654,13 @@ export function MarketingPage() {
   const [vouchers, setVouchers]       = useState<Voucher[]>([])
   const [flashSales, setFlashSales]   = useState<FlashSale[]>([])
   const [vLoading, setVLoading]       = useState(true)
+  const [vError, setVError]           = useState('')
+  const [mutationError, setMutationError] = useState('')
 
   useEffect(() => {
     vouchersApi.list()
       .then(list => setVouchers(list.map(mapApiVoucher)))
-      .catch(() => {})
+      .catch(err => setVError(err instanceof Error ? err.message : 'Gagal memuat voucher. Coba refresh halaman.'))
       .finally(() => setVLoading(false))
   }, [])
   const [activeTab, setActiveTab]     = useState('vouchers')
@@ -724,19 +726,10 @@ export function MarketingPage() {
       start_date: data.startDate, end_date: data.endDate,
       is_active: true,
     }
+    setMutationError('')
     vouchersApi.create(payload)
       .then(created => setVouchers(prev => [...prev, mapApiVoucher(created)]))
-      .catch(() => {
-        const id = `VCH-${String(vouchers.length + 1).padStart(3, '0')}`
-        setVouchers(prev => [...prev, {
-          id, code: data.code, name: data.name, type: data.type,
-          value: Number(data.value), minPurchase: Number(data.minPurchase) || 0,
-          maxDiscount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : null,
-          quota: Number(data.quota), used: 0,
-          startDate: data.startDate, endDate: data.endDate,
-          disabled: false, description: data.description || undefined,
-        }])
-      })
+      .catch(err => setMutationError(err instanceof Error ? err.message : 'Gagal menambah voucher'))
   }
 
   const handleEditVoucher = (data: VoucherFormData) => {
@@ -748,7 +741,9 @@ export function MarketingPage() {
       quota: Number(data.quota), startDate: data.startDate, endDate: data.endDate,
       description: data.description || undefined,
     }
+    const prevVouchers = vouchers
     setVouchers(prev => prev.map(v => v.id === editVoucher.id ? updated : v))
+    setMutationError('')
     vouchersApi.update(editVoucher.id, {
       code: data.code, name: data.name,
       type: data.type, discount_type: data.type,
@@ -757,22 +752,35 @@ export function MarketingPage() {
       max_discount: data.type === 'percentage' && data.maxDiscount ? Number(data.maxDiscount) : undefined,
       quota: Number(data.quota),
       start_date: data.startDate, end_date: data.endDate,
-    }).catch(() => {})
+    }).catch(err => {
+      setVouchers(prevVouchers)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mengubah voucher')
+    })
     setEditVoucher(null)
   }
 
   const handleToggleVoucher = () => {
     if (!toggleVoucher) return
     const newDisabled = !toggleVoucher.disabled
+    const prevVouchers = vouchers
     setVouchers(prev => prev.map(v => v.id === toggleVoucher.id ? { ...v, disabled: newDisabled } : v))
-    vouchersApi.update(toggleVoucher.id, { is_active: !newDisabled, status: newDisabled ? 'disabled' : 'active' }).catch(() => {})
+    setMutationError('')
+    vouchersApi.update(toggleVoucher.id, { is_active: !newDisabled, status: newDisabled ? 'disabled' : 'active' }).catch(err => {
+      setVouchers(prevVouchers)
+      setMutationError(err instanceof Error ? err.message : 'Gagal mengubah status voucher')
+    })
     setToggleVoucher(null)
   }
 
   const handleDeleteVoucher = () => {
     if (!deleteVoucher) return
+    const prevVouchers = vouchers
     setVouchers(prev => prev.filter(v => v.id !== deleteVoucher.id))
-    vouchersApi.remove(deleteVoucher.id).catch(() => {})
+    setMutationError('')
+    vouchersApi.remove(deleteVoucher.id).catch(err => {
+      setVouchers(prevVouchers)
+      setMutationError(err instanceof Error ? err.message : 'Gagal menghapus voucher')
+    })
     setDeleteVoucher(null)
   }
 
@@ -864,6 +872,12 @@ export function MarketingPage() {
 
   return (
     <div className="space-y-6">
+      {(vError || mutationError) && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          <span>{vError || mutationError}</span>
+          <button onClick={() => { setVError(''); setMutationError('') }} className="text-red-500 hover:text-red-700">✕</button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>

@@ -959,11 +959,17 @@ export function ProductManagement({
   const [categories, setCategories] = useState<ApiCategory[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
+  const [categoryError, setCategoryError] = useState('')
+  const [deleteError, setDeleteError]     = useState('')
+
   const loadCategories = useCallback(async () => {
+    setCategoryError('')
     try {
       const cats = await categoriesApi.list()
       setCategories(cats)
-    } catch { /* silent — user tetap bisa tambah produk */ }
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : 'Gagal memuat kategori produk')
+    }
   }, [])
 
   const [viewProduct, setViewProduct] = useState<Product | null>(null)
@@ -1421,7 +1427,7 @@ export function ProductManagement({
         products={products}
       />
 
-      <AlertDialog open={!!deletingProduct} onOpenChange={open => !open && setDeletingProduct(null)}>
+      <AlertDialog open={!!deletingProduct} onOpenChange={open => { if (!open) { setDeletingProduct(null); setDeleteError('') } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Produk</AlertDialogTitle>
@@ -1430,6 +1436,9 @@ export function ProductManagement({
               Stok di semua gudang akan ikut dihapus. Tindakan ini tidak dapat dibatalkan.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mx-1">{deleteError}</p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
             <AlertDialogAction
@@ -1437,11 +1446,14 @@ export function ProductManagement({
                 e.preventDefault()
                 if (!deletingProduct) return
                 setDeleting(true)
+                setDeleteError('')
                 try {
                   await deleteProduct(deletingProduct.id)
-                } catch { /* error handled in context */ } finally {
-                  setDeleting(false)
                   setDeletingProduct(null)
+                } catch (err) {
+                  setDeleteError(err instanceof Error ? err.message : 'Gagal menghapus produk. Coba lagi.')
+                } finally {
+                  setDeleting(false)
                 }
               }}
               className="bg-red-600 hover:bg-red-700 text-white"

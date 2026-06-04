@@ -878,8 +878,8 @@ export function CustomersPage() {
         return mapApiCustomer(c, agg)
       }))
     } catch (err) {
-      setCustomersError(err instanceof Error ? err.message : 'Gagal memuat pelanggan')
-      setCustomerList(customers) // fallback ke mock
+      setCustomersError(err instanceof Error ? err.message : 'Gagal memuat data pelanggan')
+      setCustomerList([])
     } finally {
       setCustomersLoading(false)
     }
