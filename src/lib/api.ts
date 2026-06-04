@@ -447,7 +447,7 @@ export const warehousesApi = {
     village?: string | null; pic?: string | null; phone?: string | null; is_primary?: boolean;
   }) => apiPost<ApiWarehouse>('/api/warehouses', data),
   update: (id: string, data: {
-    name?: string; address?: string | null;
+    code?: string; name?: string; address?: string | null;
     country?: string | null; province?: string | null; province_id?: number | null;
     city?: string | null; city_id?: number | null;
     district?: string | null; district_id?: number | null;

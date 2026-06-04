@@ -280,11 +280,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     warehousesApi.create({
       code: data.code,
       name: data.name,
-      address: data.address || null,
-      city: data.city || null,
-      pic: data.pic || null,
-      phone: data.phone || null,
-      is_primary: data.isPrimary,
+      address:     data.address     || null,
+      country:     data.country     || null,
+      province:    data.province    || null,
+      province_id: data.province_id ?? null,
+      city:        data.city        || null,
+      city_id:     data.city_id     ?? null,
+      district:    data.district    || null,
+      district_id: data.district_id ?? null,
+      village:     data.village     || null,
+      pic:         data.pic         || null,
+      phone:       data.phone       || null,
+      is_primary:  data.isPrimary,
     }).then(created => {
       const realId = created.id
       setWarehouses(prev => prev.map(w => w.id === tempId ? mapApiWarehouse(created) : w))
@@ -311,21 +318,35 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateWarehouse = useCallback((id: string, data: Omit<WarehouseLocation, 'id'>) => {
-    setWarehouses(prev => prev.map(w => {
+    const prev = warehouses.find(w => w.id === id)
+    setWarehouses(whs => whs.map(w => {
       if (w.id === id) return { ...data, id }
       if (data.isPrimary) return { ...w, isPrimary: false }
       return w
     }))
     warehousesApi.update(id, {
-      name: data.name,
-      address: data.address || null,
-      city: data.city || null,
-      pic: data.pic || null,
-      phone: data.phone || null,
-      is_primary: data.isPrimary,
-      active: data.active,
-    }).catch(() => {})
-  }, [])
+      code:        data.code,
+      name:        data.name,
+      address:     data.address     || null,
+      country:     data.country     || null,
+      province:    data.province    || null,
+      province_id: data.province_id ?? null,
+      city:        data.city        || null,
+      city_id:     data.city_id     ?? null,
+      district:    data.district    || null,
+      district_id: data.district_id ?? null,
+      village:     data.village     || null,
+      pic:         data.pic         || null,
+      phone:       data.phone       || null,
+      is_primary:  data.isPrimary,
+      active:      data.active,
+    }).catch(() => {
+      // Rollback ke state sebelumnya jika API gagal
+      if (prev) {
+        setWarehouses(whs => whs.map(w => w.id === id ? prev : w))
+      }
+    })
+  }, [warehouses])
 
   const deleteWarehouse = useCallback((id: string) => {
     setWarehouses(prev => prev.filter(w => w.id !== id))
@@ -397,6 +418,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       refWarehouseId: fromId, refWarehouseName: from?.name,
       qty, reason, by,
     })
+    // Persist ke API — transfer_out dari gudang asal
+    inventoryApi.create({
+      product_id: productId,
+      warehouse_id: fromId,
+      qty,
+      type: 'transfer_out',
+      reason,
+      ref_warehouse_id: toId,
+    }).catch(() => {})
   }, [products, warehouses, pushMovement])
 
   const value: InventoryContextValue = {
